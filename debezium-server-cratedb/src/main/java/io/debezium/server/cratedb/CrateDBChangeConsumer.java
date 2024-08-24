@@ -22,6 +22,9 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.DebeziumEngine.RecordCommitter;
@@ -118,27 +121,29 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 LOGGER.error("Table created '{}'", tableId);
             }
 
-            String upsert = "INSERT INTO %s (id, doc) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc;".formatted(tableId);
-            PreparedStatement stmt;
-            try {
-                LOGGER.error("Prepare statement");
-                stmt = conn.prepareStatement(upsert);
-                LOGGER.error("Prepare statement OK");
-            }
-            catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
+            // conn.createStatement().execute(
+            // "INSERT INTO %s (id, doc) VALUES (%q, %q) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc;"
+            // .formatted(tableId, getString(record.key())));
 
-            //
+            String upsert = "INSERT INTO %s (id, doc) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc;".formatted(tableId);
             try {
+                LOGGER.error("Prepare statement '{}'", upsert);
+                PreparedStatement stmt = conn.prepareStatement(upsert);
+                LOGGER.error("Prepare statement OK");
+
                 LOGGER.error("Insert preps");
                 stmt.setString(1, getString(record.key()));
-                stmt.setObject(2, record.value());
-                stmt.execute();
-                LOGGER.error("Inserted event OK");
+                stmt.setString(2, convertToJson(record.value()));
+                stmt.addBatch();
+
+                int[] batchInserts = stmt.executeBatch();
+                LOGGER.error("Batch insertion {}", batchInserts);
             }
             catch (SQLException e) {
-                throw new RuntimeException(e);
+                throw new RuntimeException("Failed in batch", e);
+            }
+            catch (JsonProcessingException e) {
+                throw new RuntimeException("JSON serialisation failed", e);
             }
 
             committer.markProcessed(record);
@@ -146,6 +151,11 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         }
         committer.markBatchFinished();
         LOGGER.error("Finished");
+    }
+
+    private String convertToJson(Object object) throws JsonProcessingException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        return objectMapper.writeValueAsString(object);
     }
 
     private String getTableId(ChangeEvent<Object, Object> record) {
