@@ -97,15 +97,38 @@ public class CrateDBIT {
 
     @Test
     public void testCrateDB() {
-        assertThat(2).isEqualTo(2);
-
         Testing.Print.enable();
 
         Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
             Statement stmt = conn.createStatement();
             ResultSet resultSet = stmt.executeQuery("SELECT 2 as v");
             resultSet.next();
-            return 2 == resultSet.getInt("v");
+            assertThat(resultSet.getInt("v")).isEqualTo(2);
+            resultSet.close();
+
+            Thread.sleep(3000);
+            ResultSet tablesSet = stmt.executeQuery("SHOW TABLES");
+            System.out.println("SHOW TABLES CRATE!");
+            System.out.println(tablesSet.getMetaData());
+            while (tablesSet.next()) {
+                System.out.println(tablesSet.getString(1));
+            }
+            tablesSet.close();
+
+            Thread.sleep(3000);
+            System.out.println("REFRESH!");
+            stmt.execute("REFRESH TABLE testc_inventory_customers;");
+
+            Thread.sleep(3000);
+            System.out.println("SELECT * FROM testc_inventory_customers;!");
+            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_customers;");
+            while (itemsSet.next()) {
+                System.out.println(itemsSet.getString("id"));
+                System.out.println(itemsSet.getString("doc"));
+            }
+            itemsSet.close();
+
+            return true;
         });
     }
 }

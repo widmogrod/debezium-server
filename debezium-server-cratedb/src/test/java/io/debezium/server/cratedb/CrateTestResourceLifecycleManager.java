@@ -57,11 +57,12 @@ public class CrateTestResourceLifecycleManager implements QuarkusTestResourceLif
     public Map<String, String> start() {
         container.start();
         Map<String, String> params = new ConcurrentHashMap();
-        params.put("debezium.source.cratedb.hostname", container.getHost());
-        params.put("debezium.source.cratedb.port", container.getMappedPort(CRATEDB_PORT).toString());
-        params.put("debezium.source.cratedb.user", CRATEDB_USER);
-        params.put("debezium.source.cratedb.password", CRATEDB_PASSWORD);
-        params.put("debezium.source.cratedb.dbname", CRATEDB_DBNAME);
+        params.put("debezium.sink.cratedb.connection_url", getUrl());
+        // params.put("debezium.sink.cratedb.hostname", container.getHost());
+        // params.put("debezium.sink.cratedb.port", container.getMappedPort(CRATEDB_PORT).toString());
+        // params.put("debezium.sink.cratedb.user", CRATEDB_USER);
+        // params.put("debezium.sink.cratedb.password", CRATEDB_PASSWORD);
+        // params.put("debezium.sink.cratedb.dbname", CRATEDB_DBNAME);
 
         LOGGER.info("CrateTestResourceLifecycleManager started with params: {}", params);
         return params;

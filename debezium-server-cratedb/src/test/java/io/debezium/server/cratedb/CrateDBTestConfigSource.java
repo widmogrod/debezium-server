@@ -18,6 +18,7 @@ public class CrateDBTestConfigSource extends TestConfigSource {
         Map<String, String> cratedbTest = new HashMap<>();
 
         cratedbTest.put("debezium.sink.type", "cratedb");
+        // cratedbTest.put("debezium.sink.cratedb.connection_url", "jdbc:postgresql://%s:%s/?user=crate");
         // cratedbTest.put("debezium.source.connector.class", "io.debezium.connector.mysql.MySqlConnector");
         // cratedbTest.put("debezium.source.database.hostname", "mysql");
         // cratedbTest.put("debezium.source.database.port", "3306");
