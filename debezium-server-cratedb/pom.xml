@@ -21,12 +21,6 @@
             <artifactId>debezium-server-core</artifactId>
         </dependency>
 
-        <!-- Target systems -->
-        <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>kinesis</artifactId>
-        </dependency>
-
         <!-- Testing -->
         <dependency>
             <groupId>io.quarkus</groupId>

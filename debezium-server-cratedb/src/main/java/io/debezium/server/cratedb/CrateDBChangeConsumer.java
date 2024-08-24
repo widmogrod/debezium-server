@@ -5,7 +5,6 @@
  */
 package io.debezium.server.cratedb;
 
-import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -13,32 +12,16 @@ import java.util.Optional;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.Dependent;
-import jakarta.enterprise.inject.Instance;
-import jakarta.inject.Inject;
 import jakarta.inject.Named;
 
-import org.eclipse.microprofile.config.Config;
-import org.eclipse.microprofile.config.ConfigProvider;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.debezium.DebeziumException;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.DebeziumEngine.RecordCommitter;
 import io.debezium.server.BaseChangeConsumer;
-import io.debezium.server.CustomConsumerBuilder;
-import io.debezium.util.Clock;
-import io.debezium.util.Metronome;
-
-import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
-import software.amazon.awssdk.core.SdkBytes;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.kinesis.KinesisClient;
-import software.amazon.awssdk.services.kinesis.KinesisClientBuilder;
-import software.amazon.awssdk.services.kinesis.model.KinesisException;
-import software.amazon.awssdk.services.kinesis.model.PutRecordRequest;
 
 /**
  * Implementation of the consumer that delivers the messages into CrateDB
@@ -66,81 +49,83 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     @ConfigProperty(name = PROP_PREFIX + "null.key", defaultValue = "default")
     String nullKey;
 
-    private KinesisClient client = null;
-
-    @Inject
-    @CustomConsumerBuilder
-    Instance<KinesisClient> customClient;
+    // private KinesisClient client = null;
+    //
+    // @Inject
+    // @CustomConsumerBuilder
+    // Instance<KinesisClient> customClient;
 
     @PostConstruct
     void connect() {
-        if (customClient.isResolvable()) {
-            client = customClient.get();
-            LOGGER.info("Obtained custom configured KinesisClient '{}'", client);
-            return;
-        }
-
-        final Config config = ConfigProvider.getConfig();
-        region = config.getValue(PROP_REGION_NAME, String.class);
-        endpointOverride = config.getOptionalValue(PROP_ENDPOINT_NAME, String.class);
-        credentialsProfile = config.getOptionalValue(PROP_CREDENTIALS_PROFILE, String.class);
-        final KinesisClientBuilder builder = KinesisClient.builder()
-                .region(Region.of(region));
-        endpointOverride.ifPresent(endpoint -> builder.endpointOverride(URI.create(endpoint)));
-        credentialsProfile.ifPresent(profile -> builder.credentialsProvider(ProfileCredentialsProvider.create(profile)));
-
-        client = builder.build();
-        LOGGER.info("Using default KinesisClient '{}'", client);
+        LOGGER.error("connect");
+        // if (customClient.isResolvable()) {
+        // client = customClient.get();
+        // LOGGER.info("Obtained custom configured KinesisClient '{}'", client);
+        // return;
+        // }
+        //
+        // final Config config = ConfigProvider.getConfig();
+        // region = config.getValue(PROP_REGION_NAME, String.class);
+        // endpointOverride = config.getOptionalValue(PROP_ENDPOINT_NAME, String.class);
+        // credentialsProfile = config.getOptionalValue(PROP_CREDENTIALS_PROFILE, String.class);
+        // final KinesisClientBuilder builder = KinesisClient.builder()
+        // .region(Region.of(region));
+        // endpointOverride.ifPresent(endpoint -> builder.endpointOverride(URI.create(endpoint)));
+        // credentialsProfile.ifPresent(profile -> builder.credentialsProvider(ProfileCredentialsProvider.create(profile)));
+        //
+        // client = builder.build();
+        // LOGGER.info("Using default KinesisClient '{}'", client);
     }
 
     @PreDestroy
     void close() {
-        try {
-            client.close();
-        }
-        catch (Exception e) {
-            LOGGER.warn("Exception while closing cratedb client: {}", e);
-        }
+        // try {
+        // client.close();
+        // }
+        // catch (Exception e) {
+        // LOGGER.warn("Exception while closing cratedb client: {}", e);
+        // }
     }
 
     @Override
     public void handleBatch(List<ChangeEvent<Object, Object>> records, RecordCommitter<ChangeEvent<Object, Object>> committer)
             throws InterruptedException {
+        LOGGER.error("handleBatch");
         for (ChangeEvent<Object, Object> record : records) {
             LOGGER.trace("Received event '{}'", record);
 
-            int attempts = 0;
-            while (!recordSent(record)) {
-                attempts++;
-                if (attempts >= DEFAULT_RETRIES) {
-                    throw new DebeziumException("Exceeded maximum number of attempts to publish event " + record);
-                }
-                Metronome.sleeper(RETRY_INTERVAL, Clock.SYSTEM).pause();
-            }
+            // int attempts = 0;
+            // while (!recordSent(record)) {
+            // attempts++;
+            // if (attempts >= DEFAULT_RETRIES) {
+            // throw new DebeziumException("Exceeded maximum number of attempts to publish event " + record);
+            // }
+            // Metronome.sleeper(RETRY_INTERVAL, Clock.SYSTEM).pause();
+            // }
             committer.markProcessed(record);
         }
         committer.markBatchFinished();
     }
 
-    private boolean recordSent(ChangeEvent<Object, Object> record) {
-        Object rv = record.value();
-        if (rv == null) {
-            rv = "";
-        }
-
-        final PutRecordRequest putRecord = PutRecordRequest.builder()
-                .partitionKey((record.key() != null) ? getString(record.key()) : nullKey)
-                .streamName(streamNameMapper.map(record.destination()))
-                .data(SdkBytes.fromByteArray(getBytes(rv)))
-                .build();
-
-        try {
-            client.putRecord(putRecord);
-            return true;
-        }
-        catch (KinesisException exception) {
-            LOGGER.warn("Failed to send record to {}", record.destination(), exception);
-            return false;
-        }
-    }
+    // private boolean recordSent(ChangeEvent<Object, Object> record) {
+    // Object rv = record.value();
+    // if (rv == null) {
+    // rv = "";
+    // }
+    //
+    // final PutRecordRequest putRecord = PutRecordRequest.builder()
+    // .partitionKey((record.key() != null) ? getString(record.key()) : nullKey)
+    // .streamName(streamNameMapper.map(record.destination()))
+    // .data(SdkBytes.fromByteArray(getBytes(rv)))
+    // .build();
+    //
+    // try {
+    // client.putRecord(putRecord);
+    // return true;
+    // }
+    // catch (KinesisException exception) {
+    // LOGGER.warn("Failed to send record to {}", record.destination(), exception);
+    // return false;
+    // }
+    // }
 }

@@ -14,13 +14,17 @@ import io.debezium.server.TestConfigSource;
 
 public class CrateDBTestConfigSource extends TestConfigSource {
 
-    public static final String KINESIS_REGION = "eu-central-1";
-
     public CrateDBTestConfigSource() {
         Map<String, String> cratedbTest = new HashMap<>();
 
         cratedbTest.put("debezium.sink.type", "cratedb");
-        cratedbTest.put("debezium.sink.kinesis.region", KINESIS_REGION);
+        // cratedbTest.put("debezium.source.connector.class", "io.debezium.connector.mysql.MySqlConnector");
+        // cratedbTest.put("debezium.source.database.hostname", "mysql");
+        // cratedbTest.put("debezium.source.database.port", "3306");
+        // cratedbTest.put("debezium.source.database.user", "debezium");
+        // cratedbTest.put("debezium.source.database.password", "dbz");
+        // cratedbTest.put("debezium.source.database.server.id", "23");
+        // cratedbTest.put("debezium.sink.kinesis.region", KINESIS_REGION);
         cratedbTest.put("debezium.source.connector.class", "io.debezium.connector.postgresql.PostgresConnector");
         cratedbTest.put("debezium.source." + StandaloneConfig.OFFSET_STORAGE_FILE_FILENAME_CONFIG, OFFSET_STORE_PATH.toAbsolutePath().toString());
         cratedbTest.put("debezium.source.offset.flush.interval.ms", "0");

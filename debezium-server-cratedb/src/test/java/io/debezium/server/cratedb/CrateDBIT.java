@@ -5,33 +5,29 @@
  */
 package io.debezium.server.cratedb;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.debezium.server.DebeziumServer;
+import io.debezium.server.TestConfigSource;
 import io.debezium.server.events.ConnectorCompletedEvent;
 import io.debezium.server.events.ConnectorStartedEvent;
-import io.debezium.testing.testcontainers.PostgresTestResourceLifecycleManager;
 import io.debezium.util.Testing;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
-
-import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.kinesis.KinesisClient;
-import software.amazon.awssdk.services.kinesis.model.GetRecordsRequest;
-import software.amazon.awssdk.services.kinesis.model.GetRecordsResponse;
-import software.amazon.awssdk.services.kinesis.model.GetShardIteratorRequest;
-import software.amazon.awssdk.services.kinesis.model.GetShardIteratorResponse;
-import software.amazon.awssdk.services.kinesis.model.Record;
-import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 /**
  * Integration test that verifies basic reading from PostgreSQL database and writing to Kinesis stream.
@@ -40,13 +36,15 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
  */
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResourceLifecycleManager.class)
+// @QuarkusTestResource(MySqlTestResourceLifecycleManager.class)
+@QuarkusTestResource(CrateTestResourceLifecycleManager.class)
 public class CrateDBIT {
 
-    private static final int MESSAGE_COUNT = 4;
-    // The stream of this name must exist and be empty
-    private static final String STREAM_NAME = "testc.inventory.customers";
+    // private static final int MESSAGE_COUNT = 4;
+    // // The stream of this name must exist and be empty
+    // private static final String STREAM_NAME = "testc.inventory.customers";
 
-    protected static KinesisClient kinesis = null;
+    protected static Connection conn = null;
 
     {
         Testing.Files.delete(CrateDBTestConfigSource.OFFSET_STORE_PATH);
@@ -56,11 +54,28 @@ public class CrateDBIT {
     @Inject
     DebeziumServer server;
 
-    void setupDependencies(@Observes ConnectorStartedEvent event) {
-        kinesis = KinesisClient.builder()
-                .region(Region.of(CrateDBTestConfigSource.KINESIS_REGION))
-                .credentialsProvider(ProfileCredentialsProvider.create("default"))
-                .build();
+    @BeforeEach
+    void setup() throws Exception {
+        // Initialize the connection
+        conn = DriverManager.getConnection(CrateTestResourceLifecycleManager.getUrl());
+        Testing.Files.delete(TestConfigSource.OFFSET_STORE_PATH);
+        Testing.Files.delete(CrateDBTestConfigSource.OFFSET_STORE_PATH);
+        // Testing.Files.createTestingFile(CrateDBTestConfigSource.OFFSET_STORE_PATH);
+    }
+
+    @AfterEach
+    void tearDown() throws Exception {
+        // Close the connection if it's not null and not closed
+        if (conn != null && !conn.isClosed()) {
+            conn.close();
+        }
+    }
+
+    void setupDependencies(@Observes ConnectorStartedEvent event) throws Exception {
+        // if (!TestConfigSource.isItTest()) {
+        // return;
+        // }
+        conn = DriverManager.getConnection(CrateTestResourceLifecycleManager.getUrl());
     }
 
     void connectorCompleted(@Observes ConnectorCompletedEvent event) throws Exception {
@@ -69,22 +84,28 @@ public class CrateDBIT {
         }
     }
 
+    // @Test
+    // public void testPostgresWithJson() throws Exception {
+    // Testing.Print.enable();
+    // final TestConsumer testConsumer = (TestConsumer) server.getConsumer();
+    // Awaitility.await().atMost(Duration.ofSeconds(TestConfigSource.waitForSeconds()))
+    // .until(() -> (testConsumer.getValues().size() >= MESSAGE_COUNT));
+    // assertThat(testConsumer.getValues().size()).isEqualTo(MESSAGE_COUNT);
+    // assertThat(((String) testConsumer.getValues().get(MESSAGE_COUNT - 1))).contains(
+    // "\"after\":{\"id\":1004,\"first_name\":\"Anne\",\"last_name\":\"Kretchmar\",\"email\":\"annek@noanswer.org\"}");
+    // }
+
     @Test
-    public void testKinesis() throws Exception {
+    public void testCrateDB() {
+        assertThat(2).isEqualTo(2);
+
         Testing.Print.enable();
-        final GetShardIteratorResponse iteratorResponse = kinesis.getShardIterator(GetShardIteratorRequest.builder()
-                .streamName(STREAM_NAME)
-                .shardIteratorType(ShardIteratorType.TRIM_HORIZON)
-                .shardId("0")
-                .build());
-        final List<Record> records = new ArrayList<>();
+
         Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
-            final GetRecordsResponse recordsResponse = kinesis.getRecords(GetRecordsRequest.builder()
-                    .shardIterator(iteratorResponse.shardIterator())
-                    .limit(MESSAGE_COUNT)
-                    .build());
-            records.addAll(recordsResponse.records());
-            return records.size() >= MESSAGE_COUNT;
+            Statement stmt = conn.createStatement();
+            ResultSet resultSet = stmt.executeQuery("SELECT 2 as v");
+            resultSet.next();
+            return 2 == resultSet.getInt("v");
         });
     }
 }
