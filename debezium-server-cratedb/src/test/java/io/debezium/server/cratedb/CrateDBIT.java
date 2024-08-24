@@ -111,7 +111,7 @@ public class CrateDBIT {
             List<String> ids = new ArrayList<>();
             List<String> docs = new ArrayList<>();
 
-            for (Integer i = 0; itemsSet.next(); i++) {
+            for (int i = 0; itemsSet.next(); i++) {
                 String id = itemsSet.getString(1);
                 String doc = itemsSet.getString(2);
 

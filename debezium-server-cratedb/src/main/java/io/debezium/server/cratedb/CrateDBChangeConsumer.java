@@ -54,7 +54,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
     @PostConstruct
     void connect() throws SQLException, RuntimeException {
-        LOGGER.debug("Connecting to {}", url);
+        LOGGER.info("Connecting to {}", url);
 
         if (conn == null) {
             conn = DriverManager.getConnection(url);
@@ -84,11 +84,11 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
     @PreDestroy
     void close() {
-        LOGGER.debug("closing connection...");
+        LOGGER.info("closing connection...");
         try {
             if (conn != null) {
                 conn.close();
-                LOGGER.debug("closed connection");
+                LOGGER.info("closed connection");
             }
         }
         catch (Exception e) {
@@ -98,15 +98,15 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
     @Override
     public void handleBatch(List<ChangeEvent<Object, Object>> records, RecordCommitter<ChangeEvent<Object, Object>> committer) throws InterruptedException {
-        LOGGER.error("handleBatch {}", records.size());
+        LOGGER.info("handleBatch of size {}", records.size());
 
         for (ChangeEvent<Object, Object> record : records) {
             String tableId = getTableId(record);
-            LOGGER.error("Received event");
+            LOGGER.debug("Received event");
 
             if (!tablesToCreate.contains(tableId)) {
                 tablesToCreate.add(tableId);
-                LOGGER.error("Creating table '{}'", tableId);
+                LOGGER.debug("Creating table '{}'", tableId);
 
                 try {
                     String createTable = "CREATE TABLE IF NOT EXISTS %s (id varchar PRIMARY KEY, doc OBJECT);".formatted(tableId);
@@ -115,15 +115,15 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 catch (SQLException e) {
                     throw new RuntimeException("Failed to create table '%s'".formatted(tableId), e);
                 }
-                LOGGER.error("Table created '{}'", tableId);
+                LOGGER.debug("Table created '{}'", tableId);
             }
 
             String upsert = "INSERT INTO %s (id, doc) VALUES (?::varchar, ?::JSON) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc;".formatted(tableId);
             try {
-                LOGGER.error("Prepare statement '{}'", upsert);
+                LOGGER.debug("Prepare statement '{}'", upsert);
                 PreparedStatement stmt = conn.prepareStatement(upsert);
 
-                LOGGER.error("Insert preps");
+                LOGGER.debug("Insert preps");
 
                 // https://debezium.io/documentation/reference/stable/integrations/serdes.html
                 final Serde<String> serdeKey = DebeziumSerdes.payloadJson(String.class);
@@ -137,7 +137,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 stmt.addBatch();
 
                 int[] batchInserts = stmt.executeBatch();
-                LOGGER.error("Batch insertion {}", batchInserts);
+                LOGGER.info("Batch insertion {}", batchInserts);
             }
             catch (SQLException e) {
                 throw new RuntimeException("Failed in batch", e);
@@ -147,10 +147,9 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             }
 
             committer.markProcessed(record);
-            LOGGER.error("Processed");
         }
         committer.markBatchFinished();
-        LOGGER.error("Finished");
+        LOGGER.debug("Finished batch");
     }
 
     private String convertToJson(Object object) throws JsonProcessingException {
