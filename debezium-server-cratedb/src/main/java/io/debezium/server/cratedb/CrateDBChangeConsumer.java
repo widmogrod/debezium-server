@@ -10,14 +10,17 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Named;
 
+import org.apache.kafka.common.serialization.Serde;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +31,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.DebeziumEngine.RecordCommitter;
+import io.debezium.serde.DebeziumSerdes;
 import io.debezium.server.BaseChangeConsumer;
 import io.debezium.server.StreamNameMapper;
 
@@ -41,18 +45,12 @@ import io.debezium.server.StreamNameMapper;
 public class CrateDBChangeConsumer extends BaseChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent<Object, Object>> {
     private static final Logger LOGGER = LoggerFactory.getLogger(CrateDBChangeConsumer.class);
     private static final String PROP_PREFIX = "debezium.sink.cratedb.";
-
+    // concurrency control set
+    private final Set<String> tablesToCreate = Collections.synchronizedSet(new HashSet<>());
+    protected StreamNameMapper streamNameMapper = (x) -> x.replace(".", "_");
     @ConfigProperty(name = PROP_PREFIX + "connection_url")
     String url;
-
-    protected StreamNameMapper streamNameMapper = (x) -> x.replace(".", "_");
-
-    // @Inject
-    // Instance<KinesisClient> customClient;
-    // @CustomConsumerBuilder
     private Connection conn = null;
-
-    private HashSet<String> tablesToCreate = new HashSet<String>();
 
     @PostConstruct
     void connect() throws SQLException, RuntimeException {
@@ -99,8 +97,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     }
 
     @Override
-    public void handleBatch(List<ChangeEvent<Object, Object>> records, RecordCommitter<ChangeEvent<Object, Object>> committer)
-            throws InterruptedException {
+    public void handleBatch(List<ChangeEvent<Object, Object>> records, RecordCommitter<ChangeEvent<Object, Object>> committer) throws InterruptedException {
         LOGGER.error("handleBatch {}", records.size());
 
         for (ChangeEvent<Object, Object> record : records) {
@@ -112,7 +109,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 LOGGER.error("Creating table '{}'", tableId);
 
                 try {
-                    String createTable = "CREATE TABLE IF NOT EXISTS %s (id varchar PRIMARY KEY, doc OBJECT(dynamic));".formatted(tableId);
+                    String createTable = "CREATE TABLE IF NOT EXISTS %s (id varchar PRIMARY KEY, doc OBJECT);".formatted(tableId);
                     conn.createStatement().execute(createTable);
                 }
                 catch (SQLException e) {
@@ -121,19 +118,22 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 LOGGER.error("Table created '{}'", tableId);
             }
 
-            // conn.createStatement().execute(
-            // "INSERT INTO %s (id, doc) VALUES (%q, %q) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc;"
-            // .formatted(tableId, getString(record.key())));
-
-            String upsert = "INSERT INTO %s (id, doc) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc;".formatted(tableId);
+            String upsert = "INSERT INTO %s (id, doc) VALUES (?::varchar, ?::JSON) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc;".formatted(tableId);
             try {
                 LOGGER.error("Prepare statement '{}'", upsert);
                 PreparedStatement stmt = conn.prepareStatement(upsert);
-                LOGGER.error("Prepare statement OK");
 
                 LOGGER.error("Insert preps");
-                stmt.setString(1, getString(record.key()));
-                stmt.setString(2, convertToJson(record.value()));
+
+                // https://debezium.io/documentation/reference/stable/integrations/serdes.html
+                final Serde<String> serdeKey = DebeziumSerdes.payloadJson(String.class);
+                serdeKey.configure(Collections.emptyMap(), true);
+
+                final Serde<Object> serdeValue = DebeziumSerdes.payloadJson(Object.class);
+                serdeValue.configure(Collections.singletonMap("from.field", "after"), false);
+
+                stmt.setString(1, convertToJson(serdeValue.deserializer().deserialize("xx", getBytes(record.key()))));
+                stmt.setString(2, convertToJson(serdeValue.deserializer().deserialize("xx", getBytes(record.value()))));
                 stmt.addBatch();
 
                 int[] batchInserts = stmt.executeBatch();
