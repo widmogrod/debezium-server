@@ -26,8 +26,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,7 +35,6 @@ import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.DebeziumEngine.RecordCommitter;
 import io.debezium.serde.DebeziumSerdes;
 import io.debezium.server.BaseChangeConsumer;
-import io.debezium.server.StreamNameMapper;
 
 /**
  * Implementation of the consumer that delivers the messages into CrateDB
@@ -47,13 +44,25 @@ import io.debezium.server.StreamNameMapper;
 @Named("cratedb")
 @Dependent
 public class CrateDBChangeConsumer extends BaseChangeConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent<Object, Object>> {
+    // Logger
     private static final Logger LOGGER = LoggerFactory.getLogger(CrateDBChangeConsumer.class);
+
+    // Prefix for the configuration properties
     private static final String PROP_PREFIX = "debezium.sink.cratedb.";
-    // concurrency control set
+
+    // Make sure that each table is created only once
     private final Set<String> tablesToCreate = Collections.synchronizedSet(new HashSet<>());
-    protected StreamNameMapper streamNameMapper = (x) -> x.replace(".", "_");
+
+    // Manage extraction of id and document from the Debzium message
+    // https://debezium.io/documentation/reference/stable/integrations/serdes.html
+    final Serde<String> serdeKey = DebeziumSerdes.payloadJson(String.class);
+    final ObjectMapper serdeValue = new ObjectMapper();
+
+    // Configuration properties
     @ConfigProperty(name = PROP_PREFIX + "connection_url")
     String url;
+
+    // Database connection
     private Connection conn = null;
 
     @PostConstruct
@@ -100,48 +109,19 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         }
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class DebeziumMessage {
-        private DebeziumMessagePayload payload;
-
-        public DebeziumMessage(@JsonProperty("payload") DebeziumMessagePayload payload) {
-            this.payload = payload;
-        }
-
-        public DebeziumMessagePayload getPayload() {
-            return payload;
-        }
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class DebeziumMessagePayload {
-        private String op;
-        private Object after;
-
-        public DebeziumMessagePayload(@JsonProperty("op") String op, @JsonProperty("after") Object after) {
-            this.op = op;
-            this.after = after;
-        }
-
-        public String getOp() {
-            return op;
-        }
-
-        public Object getAfter() {
-            return after;
-        }
+    @PostConstruct
+    void setupDeserializer() {
+        // normalise the table names for CrateDB
+        streamNameMapper = (x) -> x.replace(".", "_");
+        // key extraction will be used as table id
+        serdeKey.configure(Collections.emptyMap(), true);
+        // value will be deserialized as DebeziumMessage to properly handle insert update and delete
+        serdeValue.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 
     @Override
     public void handleBatch(List<ChangeEvent<Object, Object>> records, RecordCommitter<ChangeEvent<Object, Object>> committer) throws InterruptedException {
         LOGGER.info("handleBatch of size {}", records.size());
-        // https://debezium.io/documentation/reference/stable/integrations/serdes.html
-        final Serde<String> serdeKey = DebeziumSerdes.payloadJson(String.class);
-        serdeKey.configure(Collections.emptyMap(), true);
-
-        // Create ObjectMapper instance
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
         for (ChangeEvent<Object, Object> record : records) {
             String tableId = getTableId(record);
@@ -164,9 +144,8 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             LOGGER.info("Insert preps {}", record.value());
 
             try {
-                // Convert JSON string to Java object
                 String recordId = convertToJson(serdeKey.deserializer().deserialize("xx", getBytes(record.key())));
-                DebeziumMessage message = objectMapper.readValue(getBytes(record.value()), DebeziumMessage.class);
+                DebeziumMessage message = serdeValue.readValue(getBytes(record.value()), DebeziumMessage.class);
 
                 DebeziumMessagePayload payload = message.getPayload();
 
@@ -197,7 +176,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                         break;
 
                     default:
-                        LOGGER.warn("Unknown operation '{}' ignoring", payload.op);
+                        LOGGER.warn("Unknown operation '{}' ignoring", payload.getOp());
                         break;
                 }
             }
