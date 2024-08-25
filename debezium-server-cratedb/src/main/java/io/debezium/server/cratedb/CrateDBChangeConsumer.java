@@ -5,6 +5,8 @@
  */
 package io.debezium.server.cratedb;
 
+import static java.sql.Statement.EXECUTE_FAILED;
+
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -183,24 +185,54 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 catch (SQLException e) {
                     throw new RuntimeException("Failed in batch", e);
                 }
-
-                committer.markProcessed(record);
             }
 
             try {
                 if (stmtUpsert != null) {
-                    stmtUpsert.executeBatch();
-                    stmtUpsert.close();
+                    int[] processed = stmtUpsert.executeBatch();
+                    for (int i = 0; i < processed.length; i++) {
+                        if (processed[i] == EXECUTE_FAILED) {
+                            LOGGER.warn("Failed to upsert record {}", i);
+                        }
+                    }
                 }
                 if (stmtDelete != null) {
-                    stmtDelete.executeBatch();
-                    stmtDelete.close();
+                    int[] processed = stmtDelete.executeBatch();
+                    for (int i = 0; i < processed.length; i++) {
+                        if (processed[i] == EXECUTE_FAILED) {
+                            LOGGER.warn("Failed to delete record {}", i);
+                        }
+                    }
                 }
             }
             catch (SQLException e) {
                 throw new RuntimeException("Failed in batch", e);
             }
+            finally {
+                if (stmtUpsert != null) {
+                    try {
+                        stmtUpsert.close();
+                    }
+                    catch (SQLException e) {
+                        LOGGER.warn("Failed to close upsert statement", e);
+                    }
+                }
+                if (stmtDelete != null) {
+                    try {
+                        stmtDelete.close();
+                    }
+                    catch (SQLException e) {
+                        LOGGER.warn("Failed to close delete statement", e);
+                    }
+                }
+            }
         }
+
+        // mark everything as processed
+        for (ChangeEvent<Object, Object> record : records) {
+            committer.markProcessed(record);
+        }
+
         committer.markBatchFinished();
     }
 
