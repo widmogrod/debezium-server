@@ -13,8 +13,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import jakarta.annotation.PostConstruct;
@@ -129,46 +131,75 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     public void handleBatch(List<ChangeEvent<Object, Object>> records, RecordCommitter<ChangeEvent<Object, Object>> committer) throws InterruptedException {
         LOGGER.info("handleBatch of size {}", records.size());
 
+        // Deduplicate records by tableId and recordId leave only the latest record.
+        Map<String, Map<String, ChangeEvent<Object, Object>>> recordMap = new HashMap<>();
         for (ChangeEvent<Object, Object> record : records) {
             String tableId = getTableId(record);
             String recordId = getRecordId(record);
-            DebeziumMessage message = getDebeziumMessage(record);
-            DebeziumMessagePayload payload = message.getPayload();
-            String recordDoc = getRecordDoc(payload);
+            recordMap.computeIfAbsent(tableId, k -> new HashMap<>()).put(recordId, record);
+        }
 
-            LOGGER.debug("Received event tableId: '{}', recordId: '{}', op: '{}'", tableId, recordId, payload.getOp());
-
+        // Process the records per each table
+        for (Map.Entry<String, Map<String, ChangeEvent<Object, Object>>> tableEntry : recordMap.entrySet()) {
+            String tableId = tableEntry.getKey();
             maybeCreateTable(tableId);
 
+            PreparedStatement stmtUpsert = null;
+            PreparedStatement stmtDelete = null;
+
+            for (Map.Entry<String, ChangeEvent<Object, Object>> recordEntry : tableEntry.getValue().entrySet()) {
+                String recordId = recordEntry.getKey();
+                ChangeEvent<Object, Object> record = recordEntry.getValue();
+                DebeziumMessage message = getDebeziumMessage(record);
+                DebeziumMessagePayload payload = message.getPayload();
+                String recordDoc = getRecordDoc(payload);
+
+                try {
+                    switch (payload.getOp()) {
+                        case "r":
+                        case "c":
+                        case "u":
+                            if (stmtUpsert == null) {
+                                String upsert = SQL_UPSERT.formatted(tableId);
+                                stmtUpsert = conn.prepareStatement(upsert);
+                            }
+                            stmtUpsert.setString(1, recordId);
+                            stmtUpsert.setString(2, recordDoc);
+                            break;
+
+                        case "d":
+                            if (stmtDelete == null) {
+                                String delete = SQL_DELETE.formatted(tableId);
+                                stmtDelete = conn.prepareStatement(delete);
+                            }
+                            stmtDelete.setString(1, recordId);
+                            break;
+
+                        default:
+                            LOGGER.warn("Unknown operation '{}' ignoring...", payload.getOp());
+                            break;
+                    }
+                }
+                catch (SQLException e) {
+                    throw new RuntimeException("Failed in batch", e);
+                }
+
+                committer.markProcessed(record);
+            }
+
             try {
-                switch (payload.getOp()) {
-                    case "r":
-                    case "c":
-                    case "u":
-                        String upsert = SQL_UPSERT.formatted(tableId);
-                        PreparedStatement stmtUpsert = conn.prepareStatement(upsert);
-                        stmtUpsert.setString(1, recordId);
-                        stmtUpsert.setString(2, recordDoc);
-                        stmtUpsert.execute();
-                        break;
-
-                    case "d":
-                        String delete = SQL_DELETE.formatted(tableId);
-                        PreparedStatement stmtDelete = conn.prepareStatement(delete);
-                        stmtDelete.setString(1, recordId);
-                        stmtDelete.execute();
-                        break;
-
-                    default:
-                        LOGGER.warn("Unknown operation '{}' ignoring...", payload.getOp());
-                        break;
+                if (stmtUpsert != null) {
+                    stmtUpsert.executeBatch();
+                    stmtUpsert.close();
+                }
+                if (stmtDelete != null) {
+                    stmtDelete.executeBatch();
+                    stmtDelete.close();
                 }
             }
             catch (SQLException e) {
                 throw new RuntimeException("Failed in batch", e);
             }
-
-            committer.markProcessed(record);
         }
         committer.markBatchFinished();
     }
