@@ -116,6 +116,22 @@ public class CrateDBIT {
                     case 0:
                         assertThat(id).isEqualTo("\"1001\"");
                         assertThat(doc).isEqualTo("{\"last_name\":\"Thomas\",\"id\":1001,\"first_name\":\"Sally\",\"email\":\"sally.thomas@acme.com\"}");
+                        break;
+
+                    case 1:
+                        assertThat(id).isEqualTo("\"1002\"");
+                        assertThat(doc).isEqualTo("{\"last_name\":\"Bailey\",\"id\":1002,\"first_name\":\"George\",\"email\":\"gbailey@foobar.com\"}");
+                        break;
+
+                    case 2:
+                        assertThat(id).isEqualTo("\"1003\"");
+                        assertThat(doc).isEqualTo("{\"last_name\":\"Walker\",\"id\":1003,\"first_name\":\"Edward\",\"email\":\"ed@walker.com\"}");
+                        break;
+
+                    case 3:
+                        assertThat(id).isEqualTo("\"1004\"");
+                        assertThat(doc).isEqualTo("{\"last_name\":\"Kretchmar\",\"id\":1004,\"first_name\":\"Anne\",\"email\":\"annek@noanswer.org\"}");
+                        break;
                 }
             }
             itemsSet.close();
