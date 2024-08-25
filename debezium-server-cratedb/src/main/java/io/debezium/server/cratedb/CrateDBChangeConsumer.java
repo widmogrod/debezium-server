@@ -131,53 +131,28 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
         for (ChangeEvent<Object, Object> record : records) {
             String tableId = getTableId(record);
-            LOGGER.debug("Received event");
+            String recordId = getRecordId(record);
+            DebeziumMessage message = getDebeziumMessage(record);
+            DebeziumMessagePayload payload = message.getPayload();
+            String recordDoc = getRecordDoc(payload);
 
-            if (!tablesToCreate.contains(tableId)) {
-                tablesToCreate.add(tableId);
-                LOGGER.debug("Creating table '{}'", tableId);
+            LOGGER.debug("Received event tableId: '{}', recordId: '{}', op: '{}'", tableId, recordId, payload.getOp());
 
-                try {
-                    String createTable = SQL_CREATE_TABLE.formatted(tableId);
-                    try (Statement stmtCreate = conn.createStatement()) {
-                        stmtCreate.execute(createTable);
-                    }
-                }
-                catch (SQLException e) {
-                    throw new RuntimeException("Failed to create table '%s'".formatted(tableId), e);
-                }
-                LOGGER.debug("Table created '{}'", tableId);
-            }
-
-            LOGGER.info("Insert preps {}", record.value());
+            createTable(tableId);
 
             try {
-                String recordId = convertToJson(serdeKey.deserializer().deserialize("xx", getBytes(record.key())));
-                DebeziumMessage message = null;
-                try {
-                    message = serdeValue.readValue(getBytes(record.value()), DebeziumMessage.class);
-                }
-                catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-
-                DebeziumMessagePayload payload = message.getPayload();
-
                 switch (payload.getOp()) {
                     case "r":
                     case "c":
                     case "u":
                         String upsert = SQL_UPSERT.formatted(tableId);
-                        LOGGER.debug("Prepare statement '{}'", upsert);
                         PreparedStatement stmtUpsert = conn.prepareStatement(upsert);
 
-                        LOGGER.info("Headers: {}", record.headers().toArray());
                         stmtUpsert.setString(1, recordId);
-                        stmtUpsert.setString(2, convertToJson(payload.getAfter()));
+                        stmtUpsert.setString(2, recordDoc);
                         stmtUpsert.addBatch();
                         // TODO: make batching per type of operations and tables
                         int[] batchInserts = stmtUpsert.executeBatch();
-                        LOGGER.info("Batch insertion {}", batchInserts);
                         break;
 
                     case "d":
@@ -186,27 +161,66 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                         PreparedStatement stmtDelete = conn.prepareStatement(delete);
                         stmtDelete.setString(1, recordId);
                         stmtDelete.addBatch();
-                        // TODO: make batching per type of operations and tables
                         int[] batchDeletes = stmtDelete.executeBatch();
                         LOGGER.info("Batch delete {}", batchDeletes);
                         break;
 
                     default:
-                        LOGGER.warn("Unknown operation '{}' ignoring", payload.getOp());
+                        LOGGER.warn("Unknown operation '{}' ignoring...", payload.getOp());
                         break;
                 }
             }
             catch (SQLException e) {
                 throw new RuntimeException("Failed in batch", e);
             }
-            catch (JsonProcessingException e) {
-                throw new RuntimeException("JSON serialisation failed", e);
-            }
 
             committer.markProcessed(record);
         }
         committer.markBatchFinished();
-        LOGGER.debug("Finished batch");
+    }
+
+    private DebeziumMessage getDebeziumMessage(ChangeEvent<Object, Object> record) {
+        try {
+            return serdeValue.readValue(getBytes(record.value()), DebeziumMessage.class);
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String getRecordId(ChangeEvent<Object, Object> record) {
+        try {
+            return convertToJson(serdeKey.deserializer().deserialize("xx", getBytes(record.key())));
+        }
+        catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String getRecordDoc(DebeziumMessagePayload payload) {
+        try {
+            return convertToJson(payload.getAfter());
+        }
+        catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void createTable(String tableId) {
+        if (tablesToCreate.contains(tableId)) {
+            return;
+        }
+        tablesToCreate.add(tableId);
+
+        String createTable = SQL_CREATE_TABLE.formatted(tableId);
+        try {
+            try (Statement stmtCreate = conn.createStatement()) {
+                stmtCreate.execute(createTable);
+            }
+        }
+        catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private String convertToJson(Object object) throws JsonProcessingException {
