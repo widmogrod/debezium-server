@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 
@@ -23,6 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.debezium.connector.postgresql.connection.PostgresConnection;
+import io.debezium.jdbc.JdbcConnection;
 import io.debezium.server.DebeziumServer;
 import io.debezium.server.TestConfigSource;
 import io.debezium.server.events.ConnectorCompletedEvent;
@@ -136,16 +139,82 @@ public class CrateDBIT {
             }
             itemsSet.close();
 
-            // TODO: more assertion of the data row
-            // TODO: introduce update
-            // TODO: introduce deletion
+            return true;
+        });
+    }
 
-            // List<Map<String, String>> expectedIds = Arrays.asList(
-            // Collections.singletonMap("id", "{\"id\":1001}\n").put("doc", "{\"last_name\":\"Thomas\",\"id\":1001,\"first_name\":\"Sally\",\"email\":\"sally.thomas@acme.com\"}"),
-            // Collections.singletonMap("id", "{\"id\":1002}\n").put("doc", "{\"last_name\":\"Bailey\",\"id\":1002,\"first_name\":\"George\",\"email\":\"gbailey@foobar.com\"}"),
-            // Collections.singletonMap("id", "{\"id\":1003}\n").put("doc", "{\"last_name\":\"Walker\",\"id\":1003,\"first_name\":\"Edward\",\"email\":\"ed@walker.com\"}"),
-            // Collections.singletonMap("id", "{\"id\":1004}\n").put("doc", "{\"last_name\":\"Kretchmar\",\"id\":1004,\"first_name\":\"Anne\",\"email\":\"annek@noanswer.org\"}")
-            // );
+    @Test
+    public void testCrateDB2() {
+        Testing.Print.enable();
+
+        Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
+            final PostgresConnection connection = PostgresTestResourceLifecycleManager.getPostgresConnection();
+            connection.execute("CREATE TABLE inventory.cratedb_test (id INT PRIMARY KEY, descr TEXT)");
+            connection.execute("INSERT INTO inventory.cratedb_test VALUES (1, 'hello 1')");
+            connection.execute("INSERT INTO inventory.cratedb_test VALUES (2, 'hello 2')");
+            connection.execute("INSERT INTO inventory.cratedb_test VALUES (3, 'hello 3')");
+            connection.execute("DELETE FROM inventory.cratedb_test WHERE id=1");
+            connection.execute("UPDATE inventory.cratedb_test SET descr = 'hello 33' WHERE id=3");
+
+            LOGGER.info("SHOW PSQL");
+            Thread.sleep(3000);
+            connection.query("SELECT\n" +
+                    "    table_schema || '.' || table_name\n" +
+                    "FROM\n" +
+                    "    information_schema.tables\n" +
+                    "WHERE\n" +
+                    "    table_type = 'BASE TABLE'\n" +
+                    "AND\n" +
+                    "    table_schema NOT IN ('pg_catalog', 'information_schema');", new JdbcConnection.ResultSetConsumer() {
+                        @Override
+                        public void accept(ResultSet rs) throws SQLException {
+                            while (rs.next()) {
+                                LOGGER.info("Table {}", rs.getString(1));
+                            }
+                        }
+                    });
+
+            connection.close();
+
+            Statement stmt = conn.createStatement();
+
+            Thread.sleep(3000);
+            ResultSet tablesSet = stmt.executeQuery("SHOW TABLES");
+            LOGGER.info("SHOW TABLES CRATE!");
+            while (tablesSet.next()) {
+                LOGGER.info("{}", tablesSet.getString(1));
+            }
+            tablesSet.close();
+
+            Thread.sleep(3000);
+            LOGGER.info("REFRESH!");
+            stmt.execute("REFRESH TABLE testc_inventory_cratedb_test;");
+
+            Thread.sleep(3000);
+            LOGGER.info("SELECT * FROM testc_inventory_cratedb_test;");
+            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_cratedb_test ORDER BY id ASC;");
+
+            for (int i = 0; itemsSet.next(); i++) {
+                String id = itemsSet.getString(1);
+                String doc = itemsSet.getString(2);
+
+                LOGGER.info("id = {}", id);
+                LOGGER.info("doc = {}", doc);
+
+                switch (i) {
+                    case 0:
+                        assertThat(id).isEqualTo("\"2\"");
+                        assertThat(doc).isEqualTo("{\"descr\":\"hello 2\",\"id\":2}");
+                        break;
+
+                    case 1:
+                        assertThat(id).isEqualTo("\"3\"");
+                        assertThat(doc).isEqualTo("{\"descr\":\"hello 33\",\"id\":3}");
+                        break;
+
+                }
+            }
+            itemsSet.close();
 
             return true;
         });

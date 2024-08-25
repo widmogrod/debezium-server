@@ -23,15 +23,13 @@ import io.quarkus.test.common.QuarkusTestResourceLifecycleManager;
 public class CrateTestResourceLifecycleManager implements QuarkusTestResourceLifecycleManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(CrateTestResourceLifecycleManager.class);
 
-    public static final String CRATEDB_USER = "crate";
-    public static final String CRATEDB_PASSWORD = "";
-    public static final String CRATEDB_DBNAME = "";
     public static final String CRATEDB_IMAGE = "library/crate:5.8.1";
-    public static final String CRATEDB_HOST = "";
     public static final Integer CRATEDB_PORT = 5432;
+
     // ISSUE jdbc:crate:// does not work as documented
     // https://cratedb.com/docs/jdbc/en/latest/index.html
     public static final String JDBC_CRATE_URL_FORMAT = "jdbc:postgresql://%s:%s/?user=crate";
+
     private static final GenericContainer<?> container;
 
     public static String getUrl() {
@@ -58,6 +56,8 @@ public class CrateTestResourceLifecycleManager implements QuarkusTestResourceLif
         container.start();
         Map<String, String> params = new ConcurrentHashMap();
         params.put("debezium.sink.cratedb.connection_url", getUrl());
+        params.put("debezium.source.schema.include.list", "inventory");
+        params.put("debezium.source.table.include.list", "inventory.customers,inventory.cratedb_test");
         // params.put("debezium.sink.cratedb.hostname", container.getHost());
         // params.put("debezium.sink.cratedb.port", container.getMappedPort(CRATEDB_PORT).toString());
         // params.put("debezium.sink.cratedb.user", CRATEDB_USER);
@@ -88,12 +88,9 @@ public class CrateTestResourceLifecycleManager implements QuarkusTestResourceLif
     static {
         container = (new GenericContainer(CRATEDB_IMAGE))
                 .waitingFor(Wait.forLogMessage("(.*)started(.*)", 1))
-                .withExposedPorts(new Integer[]{
-                        CRATEDB_PORT,
-                        4200
-                })
+                .withExposedPorts(CRATEDB_PORT,
+                        4200)
                 .withEnv("CRATE_HEAP_SIZE", "1g")
-                // .withImagePullPolicy(PullPolicy.alwaysPull())
                 .withStartupTimeout(Duration.ofSeconds(30L));
     }
 }

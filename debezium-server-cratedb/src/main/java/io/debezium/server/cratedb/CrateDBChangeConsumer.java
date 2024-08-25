@@ -244,6 +244,14 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     }
 
     private DebeziumMessage getDebeziumMessage(ChangeEvent<Object, Object> record) {
+        Object value = record.value();
+        if (value == null) {
+            return new DebeziumMessage(
+                    new DebeziumMessagePayload(
+                            "d",
+                            null));
+        }
+
         try {
             return serdeValue.readValue(getBytes(record.value()), DebeziumMessage.class);
         }
