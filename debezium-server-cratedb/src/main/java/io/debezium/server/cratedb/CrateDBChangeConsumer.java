@@ -138,7 +138,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
             LOGGER.debug("Received event tableId: '{}', recordId: '{}', op: '{}'", tableId, recordId, payload.getOp());
 
-            createTable(tableId);
+            maybeCreateTable(tableId);
 
             try {
                 switch (payload.getOp()) {
@@ -147,22 +147,16 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                     case "u":
                         String upsert = SQL_UPSERT.formatted(tableId);
                         PreparedStatement stmtUpsert = conn.prepareStatement(upsert);
-
                         stmtUpsert.setString(1, recordId);
                         stmtUpsert.setString(2, recordDoc);
-                        stmtUpsert.addBatch();
-                        // TODO: make batching per type of operations and tables
-                        int[] batchInserts = stmtUpsert.executeBatch();
+                        stmtUpsert.execute();
                         break;
 
                     case "d":
                         String delete = SQL_DELETE.formatted(tableId);
-                        LOGGER.debug("Prepare statement '{}'", delete);
                         PreparedStatement stmtDelete = conn.prepareStatement(delete);
                         stmtDelete.setString(1, recordId);
-                        stmtDelete.addBatch();
-                        int[] batchDeletes = stmtDelete.executeBatch();
-                        LOGGER.info("Batch delete {}", batchDeletes);
+                        stmtDelete.execute();
                         break;
 
                     default:
@@ -206,7 +200,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         }
     }
 
-    private void createTable(String tableId) {
+    private void maybeCreateTable(String tableId) {
         if (tablesToCreate.contains(tableId)) {
             return;
         }
