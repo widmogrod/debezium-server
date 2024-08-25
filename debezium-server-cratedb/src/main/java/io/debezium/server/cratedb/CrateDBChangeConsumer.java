@@ -5,6 +5,7 @@
  */
 package io.debezium.server.cratedb;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -25,7 +26,10 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.debezium.engine.ChangeEvent;
@@ -96,9 +100,48 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         }
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class DebeziumMessage {
+        private DebeziumMessagePayload payload;
+
+        public DebeziumMessage(@JsonProperty("payload") DebeziumMessagePayload payload) {
+            this.payload = payload;
+        }
+
+        public DebeziumMessagePayload getPayload() {
+            return payload;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class DebeziumMessagePayload {
+        private String op;
+        private Object after;
+
+        public DebeziumMessagePayload(@JsonProperty("op") String op, @JsonProperty("after") Object after) {
+            this.op = op;
+            this.after = after;
+        }
+
+        public String getOp() {
+            return op;
+        }
+
+        public Object getAfter() {
+            return after;
+        }
+    }
+
     @Override
     public void handleBatch(List<ChangeEvent<Object, Object>> records, RecordCommitter<ChangeEvent<Object, Object>> committer) throws InterruptedException {
         LOGGER.info("handleBatch of size {}", records.size());
+        // https://debezium.io/documentation/reference/stable/integrations/serdes.html
+        final Serde<String> serdeKey = DebeziumSerdes.payloadJson(String.class);
+        serdeKey.configure(Collections.emptyMap(), true);
+
+        // Create ObjectMapper instance
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
         for (ChangeEvent<Object, Object> record : records) {
             String tableId = getTableId(record);
@@ -118,32 +161,54 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 LOGGER.debug("Table created '{}'", tableId);
             }
 
-            String upsert = "INSERT INTO %s (id, doc) VALUES (?::varchar, ?::JSON) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc;".formatted(tableId);
+            LOGGER.info("Insert preps {}", record.value());
+
             try {
-                LOGGER.debug("Prepare statement '{}'", upsert);
-                PreparedStatement stmt = conn.prepareStatement(upsert);
+                // Convert JSON string to Java object
+                String recordId = convertToJson(serdeKey.deserializer().deserialize("xx", getBytes(record.key())));
+                DebeziumMessage message = objectMapper.readValue(getBytes(record.value()), DebeziumMessage.class);
 
-                LOGGER.debug("Insert preps");
+                DebeziumMessagePayload payload = message.getPayload();
 
-                // https://debezium.io/documentation/reference/stable/integrations/serdes.html
-                final Serde<String> serdeKey = DebeziumSerdes.payloadJson(String.class);
-                serdeKey.configure(Collections.emptyMap(), true);
+                switch (payload.getOp()) {
+                    case "r":
+                    case "c":
+                    case "u":
+                        String upsert = "INSERT INTO %s (id, doc) VALUES (?::varchar, ?::JSON) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc;".formatted(tableId);
+                        LOGGER.debug("Prepare statement '{}'", upsert);
+                        PreparedStatement stmtUpsert = conn.prepareStatement(upsert);
 
-                final Serde<Object> serdeValue = DebeziumSerdes.payloadJson(Object.class);
-                serdeValue.configure(Collections.singletonMap("from.field", "after"), false);
+                        LOGGER.info("Headers: {}", record.headers().toArray());
+                        stmtUpsert.setString(1, recordId);
+                        stmtUpsert.setString(2, convertToJson(payload.getAfter()));
+                        stmtUpsert.addBatch();
+                        int[] batchInserts = stmtUpsert.executeBatch();
+                        LOGGER.info("Batch insertion {}", batchInserts);
+                        break;
 
-                stmt.setString(1, convertToJson(serdeValue.deserializer().deserialize("xx", getBytes(record.key()))));
-                stmt.setString(2, convertToJson(serdeValue.deserializer().deserialize("xx", getBytes(record.value()))));
-                stmt.addBatch();
+                    case "d":
+                        String delete = "DELETE FROM %s WHERE id = ?::varchar;".formatted(tableId);
+                        LOGGER.debug("Prepare statement '{}'", delete);
+                        PreparedStatement stmtDelete = conn.prepareStatement(delete);
+                        stmtDelete.setString(1, recordId);
+                        stmtDelete.addBatch();
+                        int[] batchDeletes = stmtDelete.executeBatch();
+                        LOGGER.info("Batch delete {}", batchDeletes);
+                        break;
 
-                int[] batchInserts = stmt.executeBatch();
-                LOGGER.info("Batch insertion {}", batchInserts);
+                    default:
+                        LOGGER.warn("Unknown operation '{}' ignoring", payload.op);
+                        break;
+                }
             }
             catch (SQLException e) {
                 throw new RuntimeException("Failed in batch", e);
             }
             catch (JsonProcessingException e) {
                 throw new RuntimeException("JSON serialisation failed", e);
+            }
+            catch (IOException e) {
+                throw new RuntimeException(e);
             }
 
             committer.markProcessed(record);

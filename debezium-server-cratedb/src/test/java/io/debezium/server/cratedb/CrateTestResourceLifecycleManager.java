@@ -64,6 +64,12 @@ public class CrateTestResourceLifecycleManager implements QuarkusTestResourceLif
         // params.put("debezium.sink.cratedb.password", CRATEDB_PASSWORD);
         // params.put("debezium.sink.cratedb.dbname", CRATEDB_DBNAME);
 
+        // https://debezium.io/documentation/reference/stable/transformations/event-flattening.html
+        // params.put("debezium.transforms", "unwrap");
+        // params.put("debezium.transforms.unwrap.type", "io.debezium.transforms.ExtractNewRecordState");
+        // params.put("debezium.transforms.unwrap.drop.tombstones", "false");
+        // params.put("debezium.transforms.unwrap.delete.handling.mode", "rewrite");
+
         LOGGER.info("CrateTestResourceLifecycleManager started with params: {}", params);
         return params;
     }

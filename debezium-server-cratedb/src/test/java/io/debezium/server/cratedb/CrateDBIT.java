@@ -12,8 +12,6 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
@@ -105,11 +103,7 @@ public class CrateDBIT {
 
             Thread.sleep(3000);
             LOGGER.info("SELECT * FROM testc_inventory_customers;");
-            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_customers;");
-
-            // assert that fetch records match expected
-            List<String> ids = new ArrayList<>();
-            List<String> docs = new ArrayList<>();
+            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_customers ORDER BY id ASC;");
 
             for (int i = 0; itemsSet.next(); i++) {
                 String id = itemsSet.getString(1);
@@ -120,7 +114,7 @@ public class CrateDBIT {
 
                 switch (i) {
                     case 0:
-                        assertThat(id).isEqualTo("{\"id\":1001}");
+                        assertThat(id).isEqualTo("\"1001\"");
                         assertThat(doc).isEqualTo("{\"last_name\":\"Thomas\",\"id\":1001,\"first_name\":\"Sally\",\"email\":\"sally.thomas@acme.com\"}");
                 }
             }
