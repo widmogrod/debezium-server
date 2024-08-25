@@ -167,6 +167,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                             }
                             stmtUpsert.setString(1, recordId);
                             stmtUpsert.setString(2, recordDoc);
+                            stmtUpsert.addBatch();
                             break;
 
                         case "d":
@@ -175,6 +176,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                                 stmtDelete = conn.prepareStatement(delete);
                             }
                             stmtDelete.setString(1, recordId);
+                            stmtDelete.addBatch();
                             break;
 
                         default:
@@ -183,7 +185,8 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                     }
                 }
                 catch (SQLException e) {
-                    throw new RuntimeException("Failed in batch", e);
+                    closeStatements(stmtUpsert, stmtDelete);
+                    throw new RuntimeException("Failed in prepare", e);
                 }
             }
 
@@ -209,22 +212,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 throw new RuntimeException("Failed in batch", e);
             }
             finally {
-                if (stmtUpsert != null) {
-                    try {
-                        stmtUpsert.close();
-                    }
-                    catch (SQLException e) {
-                        LOGGER.warn("Failed to close upsert statement", e);
-                    }
-                }
-                if (stmtDelete != null) {
-                    try {
-                        stmtDelete.close();
-                    }
-                    catch (SQLException e) {
-                        LOGGER.warn("Failed to close delete statement", e);
-                    }
-                }
+                closeStatements(stmtUpsert, stmtDelete);
             }
         }
 
@@ -234,6 +222,25 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         }
 
         committer.markBatchFinished();
+    }
+
+    private static void closeStatements(PreparedStatement stmtUpsert, PreparedStatement stmtDelete) {
+        if (stmtUpsert != null) {
+            try {
+                stmtUpsert.close();
+            }
+            catch (SQLException e) {
+                LOGGER.warn("Failed to close upsert statement", e);
+            }
+        }
+        if (stmtDelete != null) {
+            try {
+                stmtDelete.close();
+            }
+            catch (SQLException e) {
+                LOGGER.warn("Failed to close delete statement", e);
+            }
+        }
     }
 
     private DebeziumMessage getDebeziumMessage(ChangeEvent<Object, Object> record) {
