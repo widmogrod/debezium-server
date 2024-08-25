@@ -11,6 +11,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -138,7 +139,9 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
                 try {
                     String createTable = SQL_CREATE_TABLE.formatted(tableId);
-                    conn.createStatement().execute(createTable);
+                    try (Statement stmtCreate = conn.createStatement()) {
+                        stmtCreate.execute(createTable);
+                    }
                 }
                 catch (SQLException e) {
                     throw new RuntimeException("Failed to create table '%s'".formatted(tableId), e);
@@ -150,7 +153,13 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
             try {
                 String recordId = convertToJson(serdeKey.deserializer().deserialize("xx", getBytes(record.key())));
-                DebeziumMessage message = serdeValue.readValue(getBytes(record.value()), DebeziumMessage.class);
+                DebeziumMessage message = null;
+                try {
+                    message = serdeValue.readValue(getBytes(record.value()), DebeziumMessage.class);
+                }
+                catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
 
                 DebeziumMessagePayload payload = message.getPayload();
 
@@ -193,9 +202,6 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             catch (JsonProcessingException e) {
                 throw new RuntimeException("JSON serialisation failed", e);
             }
-            catch (IOException e) {
-                throw new RuntimeException(e);
-            }
 
             committer.markProcessed(record);
         }
@@ -204,8 +210,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     }
 
     private String convertToJson(Object object) throws JsonProcessingException {
-        ObjectMapper objectMapper = new ObjectMapper();
-        return objectMapper.writeValueAsString(object);
+        return serdeValue.writeValueAsString(object);
     }
 
     private String getTableId(ChangeEvent<Object, Object> record) {
