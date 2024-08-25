@@ -47,6 +47,11 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     // Logger
     private static final Logger LOGGER = LoggerFactory.getLogger(CrateDBChangeConsumer.class);
 
+    // SQL statements used to interact with the CrateDB
+    private static final String SQL_CREATE_TABLE = "CREATE TABLE IF NOT EXISTS %s (id varchar PRIMARY KEY, doc OBJECT)";
+    private static final String SQL_UPSERT = "INSERT INTO %s (id, doc) VALUES (?::varchar, ?::JSON) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc";
+    private static final String SQL_DELETE = "DELETE FROM %s WHERE id = ?::varchar";
+
     // Prefix for the configuration properties
     private static final String PROP_PREFIX = "debezium.sink.cratedb.";
 
@@ -132,7 +137,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 LOGGER.debug("Creating table '{}'", tableId);
 
                 try {
-                    String createTable = "CREATE TABLE IF NOT EXISTS %s (id varchar PRIMARY KEY, doc OBJECT);".formatted(tableId);
+                    String createTable = SQL_CREATE_TABLE.formatted(tableId);
                     conn.createStatement().execute(createTable);
                 }
                 catch (SQLException e) {
@@ -153,7 +158,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                     case "r":
                     case "c":
                     case "u":
-                        String upsert = "INSERT INTO %s (id, doc) VALUES (?::varchar, ?::JSON) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc;".formatted(tableId);
+                        String upsert = SQL_UPSERT.formatted(tableId);
                         LOGGER.debug("Prepare statement '{}'", upsert);
                         PreparedStatement stmtUpsert = conn.prepareStatement(upsert);
 
@@ -161,16 +166,18 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                         stmtUpsert.setString(1, recordId);
                         stmtUpsert.setString(2, convertToJson(payload.getAfter()));
                         stmtUpsert.addBatch();
+                        // TODO: make batching per type of operations and tables
                         int[] batchInserts = stmtUpsert.executeBatch();
                         LOGGER.info("Batch insertion {}", batchInserts);
                         break;
 
                     case "d":
-                        String delete = "DELETE FROM %s WHERE id = ?::varchar;".formatted(tableId);
+                        String delete = SQL_DELETE.formatted(tableId);
                         LOGGER.debug("Prepare statement '{}'", delete);
                         PreparedStatement stmtDelete = conn.prepareStatement(delete);
                         stmtDelete.setString(1, recordId);
                         stmtDelete.addBatch();
+                        // TODO: make batching per type of operations and tables
                         int[] batchDeletes = stmtDelete.executeBatch();
                         LOGGER.info("Batch delete {}", batchDeletes);
                         break;

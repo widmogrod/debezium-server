@@ -120,6 +120,10 @@ public class CrateDBIT {
             }
             itemsSet.close();
 
+            // TODO: more assertion of the data row
+            // TODO: introduce update
+            // TODO: introduce deletion
+
             // List<Map<String, String>> expectedIds = Arrays.asList(
             // Collections.singletonMap("id", "{\"id\":1001}\n").put("doc", "{\"last_name\":\"Thomas\",\"id\":1001,\"first_name\":\"Sally\",\"email\":\"sally.thomas@acme.com\"}"),
             // Collections.singletonMap("id", "{\"id\":1002}\n").put("doc", "{\"last_name\":\"Bailey\",\"id\":1002,\"first_name\":\"George\",\"email\":\"gbailey@foobar.com\"}"),
