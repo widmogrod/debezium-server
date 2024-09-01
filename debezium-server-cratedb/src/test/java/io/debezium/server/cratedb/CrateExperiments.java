@@ -13,15 +13,20 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.postgresql.util.PSQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.*;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,8 +80,6 @@ public class CrateExperiments {
     public static class UseCase {
         public String name;
         public Object insertJSON;
-        public String insertColumn;
-        public String expectedInsertColumnType;
 
         public String toString() {
             ObjectMapper mapper = new ObjectMapper();
@@ -142,7 +145,6 @@ public class CrateExperiments {
         });
     }
 
-
     @Test
     public void testNestedLevelArray() {
         assertDoesNotThrow(() -> {
@@ -181,82 +183,6 @@ public class CrateExperiments {
             }
         });
         ;
-    }
-
-
-    @ParameterizedTest
-    @MethodSource("provideTypesForTest")
-    public void testCreateAndInsertJson(UseCase useCase) {
-        assertDoesNotThrow(() -> {
-            ObjectMapper mapper = new ObjectMapper();
-            try (Statement stmt = conn.createStatement()) {
-                stmt.execute("DROP TABLE IF EXISTS test");
-                stmt.execute("CREATE TABLE test (id TEXT PRIMARY KEY, doc OBJECT)");
-
-                AtomicReference<String> insertJSON = new AtomicReference<>();
-                assertDoesNotThrow(() -> {
-                    insertJSON.set(mapper.writeValueAsString(new Object() {
-                        public Object name = useCase.insertJSON;
-                    }));
-                });
-
-                PreparedStatement prep = conn.prepareStatement("INSERT INTO test (id, doc) VALUES ('1', ?::JSON) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc");
-                prep.setString(1, insertJSON.get());
-                prep.execute();
-
-                stmt.execute("REFRESH TABLE test");
-                ResultSet result = stmt.executeQuery("SELECT doc FROM test WHERE id = '1'");
-                result.next();
-
-//                assertThat(result.getString(1)).isEqualTo(useCase.expectedInsertJSON);
-//                result.close();
-
-                // get type of the column doc.name and check it is a string
-                ResultSet rs = stmt.executeQuery("SELECT data_type FROM information_schema.columns WHERE table_name = 'test' AND column_name = '" + useCase.insertColumn + "';");
-                rs.next();
-
-                String dataType = rs.getString(1);
-//            assertThat(dataType).isEqualTo(useCase.expectedInsertColumnType);
-//            LOGGER.error("intput: {}", useCase.insertJSON);
-//            LOGGER.error("output: {}", dataType);
-
-                results.add(List.of(insertJSON.get(), dataType));
-
-//                // insert object with same key but different value type
-//                prep.setString(1, useCase.updateJSON);
-//                prep.execute();
-//
-//                ResultSet result2 = stmt.executeQuery("SELECT doc FROM test WHERE id = '1'");
-//                result2.next();
-//
-//                assertThat(result2.getString(1)).isEqualTo(useCase.expectedUpdateJSON);
-//                result2.close();
-            }
-        });
-    }
-
-
-    static Stream<UseCase> provideTypesForTest() {
-        List<Object> covertToTypes = generateInputs(new ArrayList<>(List.of(
-                "John Doe",
-                123,
-                98.45,
-                true,
-                false
-        )));
-
-        // create matrix of types to see which starting type can convert gracefully to which other type
-        ArrayList<UseCase> useCases = new ArrayList<>();
-        for (Object type1 : covertToTypes) {
-            useCases.add(new UseCase() {{
-                name = type1.getClass().getSimpleName(); // + " to " + type2.getClass().getSimpleName();
-                insertJSON = type1;
-                insertColumn = "doc[''name'']";
-                expectedInsertColumnType = "text";
-            }});
-        }
-
-        return useCases.stream();
     }
 
     private static @NotNull List<Object> generateInputs(List<Object> primitiveTypes) {
