@@ -69,7 +69,7 @@ public class CrateExperiments {
         // Write results to CSV file
         try (java.io.FileWriter csvWriter = new java.io.FileWriter("results.csv")) {
             for (List<String> rowData : results) {
-                csvWriter.append(String.join(",", rowData));
+                csvWriter.append(formatCsvRow(rowData));
                 csvWriter.append("\n");
             }
         } catch (Exception e) {
