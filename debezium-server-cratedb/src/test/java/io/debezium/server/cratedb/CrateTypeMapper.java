@@ -5,11 +5,12 @@
  */
 package io.debezium.server.cratedb;
 
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+
+import org.junit.jupiter.api.Test;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Test how CrateDB types are mapped to CrateDB types.
@@ -85,5 +86,20 @@ public class CrateTypeMapper {
     @Test
     void testRealArrayTypeConversion() {
         assertThat(CrateDBType.from("[0.1, 2.2]").getColumnType()).isEqualTo("ARRAY(REAL)");
+    }
+
+    @Test
+    void testWrapObject() {
+        assertDoesNotThrow(() -> {
+            String input = "{\"name1\":\"Jon\", \"po\": [{\"a\":1}, {\"a\":2, \"b\": [[{\"c\":1}, {\"c\":2}]]}]}";
+            ObjectMapper mapper = new ObjectMapper();
+            Object object = mapper.readValue(input, Object.class);
+            Object transformed = CrateDBType.wrap(object);
+
+            String output = mapper.writeValueAsString(transformed);
+
+            assertThat(output).isNotEqualTo(input);
+            assertThat(output).isEqualTo("{\"name1_t\":\"Jon\",\"po_arr_o\":[{\"a_i\":1},{\"a_i\":2,\"b_arr_a\":[[{\"c_i\":1},{\"c_i\":2}]]}]}");
+        });
     }
 }

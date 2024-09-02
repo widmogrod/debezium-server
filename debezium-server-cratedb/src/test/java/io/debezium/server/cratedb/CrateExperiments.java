@@ -5,17 +5,9 @@
  */
 package io.debezium.server.cratedb;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.junit.QuarkusTest;
-import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.postgresql.util.PSQLException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -29,9 +21,19 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.postgresql.util.PSQLException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
 
 /**
  * Integration test validating CrateDB behavior under certain conditions.
@@ -72,7 +74,8 @@ public class CrateExperiments {
                 csvWriter.append(formatCsvRow(rowData));
                 csvWriter.append("\n");
             }
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             LOGGER.error("Error writing to CSV file: {}", e.getMessage());
         }
     }
@@ -86,7 +89,8 @@ public class CrateExperiments {
             String json = null;
             try {
                 json = mapper.writeValueAsString(insertJSON);
-            } catch (Exception ignored) {
+            }
+            catch (Exception ignored) {
             }
 
             return "UseCase{" +
@@ -103,8 +107,7 @@ public class CrateExperiments {
                 123,
                 98.45,
                 true,
-                false
-        ));
+                false));
 
         ObjectMapper mapper = new ObjectMapper();
 
@@ -122,7 +125,6 @@ public class CrateExperiments {
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("DROP TABLE IF EXISTS test");
                 stmt.execute("CREATE TABLE test (id TEXT PRIMARY KEY, doc OBJECT)");
-
 
                 PreparedStatement prep = conn.prepareStatement("INSERT INTO test (id, doc) VALUES ('1', ?::JSON) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc");
                 prep.setString(1, "{\"name\": [\"John Doe\"]}");
@@ -168,7 +170,8 @@ public class CrateExperiments {
                 });
 
                 assertDoesNotThrow(() -> {
-                    PreparedStatement prep = conn.prepareStatement("INSERT INTO test (id, doc) VALUES ('1', ?::OBJECT) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc");
+                    PreparedStatement prep = conn
+                            .prepareStatement("INSERT INTO test (id, doc) VALUES ('1', ?::OBJECT) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc");
                     prep.setString(1, subject);
                     prep.execute();
                 });
@@ -182,7 +185,6 @@ public class CrateExperiments {
                 });
             }
         });
-        ;
     }
 
     private static @NotNull List<Object> generateInputs(List<Object> primitiveTypes) {
@@ -227,8 +229,7 @@ public class CrateExperiments {
             new CrateType("t_array_real", "ARRAY(REAL)"),
             new CrateType("t_float_vector", "FLOAT_VECTOR(2)"),
             new CrateType("t_geo_point", "GEO_POINT"),
-            new CrateType("t_geo_shape", "GEO_SHAPE")
-    );
+            new CrateType("t_geo_shape", "GEO_SHAPE"));
 
     public static class CrateType {
         public String columnName;
@@ -258,26 +259,26 @@ public class CrateExperiments {
             new TypeConflict("+2024-12-31T23:59:59.999Z", "TIMESTAMP"),
             new TypeConflict("0110", "BIT"),
             new TypeConflict("0:0:0:0:0:ffff:c0a8:64"),
-            new TypeConflict(new Float[]{4.24f, 7.1f}, "ARRAY(REAL)"),
-            new TypeConflict(new Float[]{4.34f, 7.1f}),
-            new TypeConflict(new Float[]{4.44f, 7.1f}, "FLOAT_VECTOR(2)"),
-            new TypeConflict(new Float[][]{{4.54f, 7.1f}}),
+            new TypeConflict(new Float[]{ 4.24f, 7.1f }, "ARRAY(REAL)"),
+            new TypeConflict(new Float[]{ 4.34f, 7.1f }),
+            new TypeConflict(new Float[]{ 4.44f, 7.1f }, "FLOAT_VECTOR(2)"),
+            new TypeConflict(new Float[][]{ { 4.54f, 7.1f } }),
             new TypeConflict("POINT (9.7417 47.4108)"),
             new TypeConflict("POLYGON ((5 5, 10 5, 10 10, 5 10, 5 5))")
-            // Tested and don't work, removed from the list
-//            new TypeConflict("[2.03, 31.1, 4.5, 5.6]"),
-//            new TypeConflict("[1,2]"),
-//            new TypeConflict("[3.14, 27.34]", "FLOAT_VECTOR"),
-//            new TypeConflict("[3.24, 27.34]", "ARRAY(REAL)"),
-//            new TypeConflict("ARRAY[3.34, 27.34]"),
-//            new TypeConflict("ARRAY[3.44, 27.34]", "ARRAY(REAL)"),
-//            new TypeConflict("{3.54, 27.34}", "ARRAY(TEXT)::ARRAY(REAL)"),
-//            new TypeConflict("{3.64, 27.34}", "ARRAY(TEXT)::ARRAY(REAL)::FLOAT_VECTOR(2)"),
-//            new TypeConflict(new ArrayList<>(List.of(4.44f, 7.1f)), "FLOAT_VECTOR(2)"),
-//            new TypeConflict(new Vector<>(List.of(5.5f, 7.1f)), "FLOAT_VECTOR(2)"),
-//            new TypeConflict(new Object() {
-//                public Float[][] key_array_array_real = {{4.64f, 7.1f}};
-//            })
+    // Tested and don't work, removed from the list
+    // new TypeConflict("[2.03, 31.1, 4.5, 5.6]"),
+    // new TypeConflict("[1,2]"),
+    // new TypeConflict("[3.14, 27.34]", "FLOAT_VECTOR"),
+    // new TypeConflict("[3.24, 27.34]", "ARRAY(REAL)"),
+    // new TypeConflict("ARRAY[3.34, 27.34]"),
+    // new TypeConflict("ARRAY[3.44, 27.34]", "ARRAY(REAL)"),
+    // new TypeConflict("{3.54, 27.34}", "ARRAY(TEXT)::ARRAY(REAL)"),
+    // new TypeConflict("{3.64, 27.34}", "ARRAY(TEXT)::ARRAY(REAL)::FLOAT_VECTOR(2)"),
+    // new TypeConflict(new ArrayList<>(List.of(4.44f, 7.1f)), "FLOAT_VECTOR(2)"),
+    // new TypeConflict(new Vector<>(List.of(5.5f, 7.1f)), "FLOAT_VECTOR(2)"),
+    // new TypeConflict(new Object() {
+    // public Float[][] key_array_array_real = {{4.64f, 7.1f}};
+    // })
     );
 
     public static class TypeConflict {
@@ -336,7 +337,8 @@ public class CrateExperiments {
                         String insertSql = "INSERT INTO test (id, " + type.columnName + ")";
                         if (typeConflict.typeCast.isPresent()) {
                             insertSql += " VALUES (?, ?::" + typeConflict.typeCast.get() + ")";
-                        } else {
+                        }
+                        else {
                             insertSql += " VALUES (?, ?)";
                         }
 
@@ -351,7 +353,8 @@ public class CrateExperiments {
                             // Can't infer the SQL type to use for an instance of java.util.ImmutableCollections$List12. Use setObject() with an explicit Types value to specify the type to use.
                             prep.setObject(2, typeConflict.value);
                             prep.execute();
-                        } catch (Exception e) {
+                        }
+                        catch (Exception e) {
                             String firstLineOfMessage = e.getMessage().split("\n")[0];
                             table.get(id).putIfAbsent(type.columnName, firstLineOfMessage);
                             LOGGER.error("Failed to insert {} into {}; {}", typeConflict.value, type.columnName, firstLineOfMessage);
@@ -401,7 +404,8 @@ public class CrateExperiments {
                         csvWriter.append(formatCsvRow(rowData));
                         csvWriter.append("\n");
                     }
-                } catch (Exception e) {
+                }
+                catch (Exception e) {
                     LOGGER.error("Error writing to CSV file: {}", e.getMessage());
                 }
             }
