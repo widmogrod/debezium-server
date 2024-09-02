@@ -14,6 +14,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -264,7 +265,11 @@ public class CrateExperiments {
             new TypeConflict(new Float[]{ 4.44f, 7.1f }, "FLOAT_VECTOR(2)"),
             new TypeConflict(new Float[][]{ { 4.54f, 7.1f } }),
             new TypeConflict("POINT (9.7417 47.4108)"),
-            new TypeConflict("POLYGON ((5 5, 10 5, 10 10, 5 10, 5 5))")
+            new TypeConflict("POLYGON ((5 5, 10 5, 10 10, 5 10, 5 5))"),
+            new TypeConflict(LocalTime.now()),
+            new TypeConflict(java.time.LocalDate.now()),
+            new TypeConflict(java.time.LocalDateTime.now()),
+            new TypeConflict(java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()))
     // Tested and don't work, removed from the list
     // new TypeConflict("[2.03, 31.1, 4.5, 5.6]"),
     // new TypeConflict("[1,2]"),
@@ -411,6 +416,19 @@ public class CrateExperiments {
             }
         });
 
+        assertDoesNotThrow(() -> {
+            try (Statement stmt = conn.createStatement()) {
+                String sql = "SELECT column_details, column_name, data_type, table_schema\n" +
+                        "FROM information_schema.columns WHERE table_catalog = 'crate' AND table_name = 'test'";
+
+                ResultSet rs = stmt.executeQuery(sql);
+
+                while (rs.next()) {
+                    LOGGER.error("Column details: {} {} {} {}", rs.getString("column_details"), rs.getString("column_name"), rs.getString("data_type"), rs.getString("table_schema"));
+                }
+
+            }
+        });
     }
 
     private static String formatCsvRow(List<String> rowData) {
