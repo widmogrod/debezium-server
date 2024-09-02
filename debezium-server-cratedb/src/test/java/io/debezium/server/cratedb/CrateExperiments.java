@@ -14,7 +14,13 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -267,9 +273,12 @@ public class CrateExperiments {
             new TypeConflict("POINT (9.7417 47.4108)"),
             new TypeConflict("POLYGON ((5 5, 10 5, 10 10, 5 10, 5 5))"),
             new TypeConflict(LocalTime.now()),
-            new TypeConflict(java.time.LocalDate.now()),
-            new TypeConflict(java.time.LocalDateTime.now()),
-            new TypeConflict(java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()))
+            new TypeConflict(LocalDate.now()),
+            new TypeConflict(LocalDateTime.now()),
+            new TypeConflict(Timestamp.valueOf(LocalDateTime.now())),
+            new TypeConflict(ZonedDateTime.now()),
+            new TypeConflict(OffsetDateTime.now()),
+            new TypeConflict(Instant.now())
     // Tested and don't work, removed from the list
     // new TypeConflict("[2.03, 31.1, 4.5, 5.6]"),
     // new TypeConflict("[1,2]"),
