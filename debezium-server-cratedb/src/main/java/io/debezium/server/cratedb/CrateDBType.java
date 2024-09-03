@@ -33,15 +33,31 @@ public class CrateDBType {
     private static final String POINT_REGEX = "POINT";
     private static final Pattern pointPattern = Pattern.compile(POINT_REGEX + WHITESPACES_REGEX + "\\(" + NUMBER_REGEX + WHITESPACES_REGEX + NUMBER_REGEX + "\\)");
     private final Type type;
-    private String extra = null;
+    private Map<String, CrateDBType> objectOf = null;
+    private CrateDBType arrayOf = null;
 
     public CrateDBType(Type type) {
+        if (type == Type.ARRAY) {
+            throw new IllegalArgumentException("Array must by typed");
+        }
+
         this.type = type;
     }
 
-    public CrateDBType(Type type, String extra) {
+    public CrateDBType(Type type, CrateDBType arrayOf) {
+        if (type != Type.ARRAY) {
+            throw new IllegalArgumentException("Only ARRAY types are supported");
+        }
         this.type = type;
-        this.extra = extra;
+        this.arrayOf = arrayOf;
+    }
+
+    public CrateDBType(Type type, Map<String, CrateDBType> objectOf) {
+        if (type != Type.OBJECT) {
+            throw new IllegalArgumentException("Only OBJECT types are supported");
+        }
+        this.type = type;
+        this.objectOf = objectOf;
     }
 
     public static CrateDBType from(Object o) {
@@ -116,12 +132,10 @@ public class CrateDBType {
 
             case List x -> {
                 if (x.isEmpty()) {
-                    // TODO should we throw an exception here?
-                    // we don't know what is the type of the array
-                    yield new CrateDBType(Type.ARRAY, "TEXT");
+                    throw new EmptyArrayException();
                 }
 
-                yield new CrateDBType(Type.ARRAY, from(x.getFirst()).getColumnType());
+                yield new CrateDBType(Type.ARRAY, from(x.getFirst()));
             }
 
             case Map x -> {
@@ -129,17 +143,17 @@ public class CrateDBType {
                     yield new CrateDBType(Type.OBJECT);
                 }
 
-                // iterate over keys and values
-                String columnType = "(";
+                Map<String, CrateDBType> objectOf = new LinkedHashMap<>();
                 for (Object key : x.keySet()) {
-                    columnType += key + " AS ";
-                    columnType += from(x.get(key)).getColumnType();
-                    columnType += ", ";
+                    try {
+                        objectOf.put(key.toString(), from(x.get(key)));
+                    }
+                    catch (EmptyArrayException ignored) {
+                        // remove emtpy arrays from inference
+                    }
                 }
-                columnType = columnType.substring(0, columnType.length() - 2);
-                columnType += ")";
 
-                yield new CrateDBType(Type.OBJECT, columnType);
+                yield new CrateDBType(Type.OBJECT, objectOf);
             }
 
             default -> throw new IllegalStateException("Unexpected value: " + o);
@@ -184,10 +198,23 @@ public class CrateDBType {
             case BIGINT, DATE -> "BIGINT";
             case REAL -> "REAL";
             case TIME, TIMESTAMP, TIMESTAMPTZ, TIMESTAMPWOZ -> "TIMETZ";
-            case BIT -> "BIT(" + extra + ")";
-            case ARRAY -> "ARRAY(" + extra + ")";
-            case OBJECT -> "OBJECT" + (extra != null ? " AS " + extra : "");
             case GEO_POINT -> "GEO_POINT";
+//            case BIT -> "BIT(" + extra + ")";
+            case ARRAY -> "ARRAY(" + arrayOf.getColumnType() + ")";
+            case OBJECT -> {
+                if (objectOf == null || objectOf.isEmpty()) {
+                    yield "OBJECT";
+                }
+
+                String result = "OBJECT AS (";
+                for (Map.Entry<String, CrateDBType> entry : objectOf.entrySet()) {
+                    result += entry.getKey() + " " + entry.getValue().getColumnType();
+                    result += ",";
+                }
+
+                result = result.substring(0, result.length() - 1) + ")";
+                yield result;
+            }
         };
     }
 
@@ -196,10 +223,9 @@ public class CrateDBType {
             case TEXT, IP, BOOLEAN -> "t";
             case BIGINT, DATE -> "i";
             case REAL -> "f";
-            case TIME, TIMESTAMP, TIMESTAMPTZ, TIMESTAMPWOZ -> "t";
-            case BIT -> "b";
-            // arr_ + first string of extra lowercase
-            case ARRAY -> "arr" + (!extra.isEmpty() ? "_" + extra.substring(0, 1).toLowerCase() : "");
+            case TIME, TIMESTAMP, TIMESTAMPTZ, TIMESTAMPWOZ -> "ts";
+//            case BIT -> "b";
+            case ARRAY -> "arr_" + arrayOf.getShortName();
             case OBJECT -> "o";
             case GEO_POINT -> "p";
         };
@@ -216,9 +242,13 @@ public class CrateDBType {
         TIMESTAMPTZ,
         TIMESTAMPWOZ,
         IP,
-        BIT,
+        //        BIT,
         ARRAY,
         OBJECT,
         GEO_POINT;
     }
+
+    public static class EmptyArrayException extends RuntimeException {
+    }
 }
+

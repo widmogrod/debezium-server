@@ -40,17 +40,17 @@ public class CrateTypeMapper {
 
     @Test
     void testComplexObjectTypeConversion1() {
-        assertThat(CrateDBType.from("{\"name1\":\"Jon\"}").getColumnType()).isEqualTo("OBJECT AS (name1 AS TEXT)");
+        assertThat(CrateDBType.from("{\"name1\":\"Jon\"}").getColumnType()).isEqualTo("OBJECT AS (name1 TEXT)");
     }
 
     @Test
     void testComplexObjectTypeConversion2() {
-        assertThat(CrateDBType.from("{\"name2\":[\"Jon\"]}").getColumnType()).isEqualTo("OBJECT AS (name2 AS ARRAY(TEXT))");
+        assertThat(CrateDBType.from("{\"name2\":[\"Jon\"]}").getColumnType()).isEqualTo("OBJECT AS (name2 ARRAY(TEXT))");
     }
 
     @Test
     void testNestedArrayObjectTypeConversion() {
-        assertThat(CrateDBType.from("{\"name3\":[[\"Jon\"]]}").getColumnType()).isEqualTo("OBJECT AS (name3 AS ARRAY(ARRAY(TEXT)))");
+        assertThat(CrateDBType.from("{\"name3\":[[\"Jon\"]]}").getColumnType()).isEqualTo("OBJECT AS (name3 ARRAY(ARRAY(TEXT)))");
     }
 
     @Test
@@ -91,7 +91,30 @@ public class CrateTypeMapper {
     @Test
     void testWrapObject() {
         assertDoesNotThrow(() -> {
-            String input = "{\"name1\":\"Jon\", \"po\": [{\"a\":1}, {\"a\":2, \"b\": [[{\"c\":1}, {\"c\":2}]]}]}";
+            String input = """
+                    {
+                      "name1": "Jon",
+                      "po": [
+                        {
+                          "a": 1
+                        },
+                        {
+                          "a": "Test",
+                          "b": [
+                            [
+                              {
+                                "c": 1
+                              },
+                              {
+                                "c": [false]
+                              }
+                            ]
+                          ]
+                        },
+                        1,
+                        false
+                      ]
+                    }""";
             ObjectMapper mapper = new ObjectMapper();
             Object object = mapper.readValue(input, Object.class);
             Object transformed = CrateDBType.wrap(object);
@@ -99,7 +122,8 @@ public class CrateTypeMapper {
             String output = mapper.writeValueAsString(transformed);
 
             assertThat(output).isNotEqualTo(input);
-            assertThat(output).isEqualTo("{\"name1_t\":\"Jon\",\"po_arr_o\":[{\"a_i\":1},{\"a_i\":2,\"b_arr_a\":[[{\"c_i\":1},{\"c_i\":2}]]}]}");
+            assertThat(output).isEqualTo("""
+                    {"name1_t":"Jon","po_arr_o":[{"a_i":1},{"a_t":"Test","b_arr_arr_o":[[{"c_i":1},{"c_arr_t":[false]}]]},1,false]}""");
         });
     }
 }
