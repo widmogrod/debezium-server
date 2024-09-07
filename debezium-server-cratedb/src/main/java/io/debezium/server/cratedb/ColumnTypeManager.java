@@ -63,9 +63,7 @@ public class ColumnTypeManager {
             case TextType() -> typeName(c);
             case ArrayType(ColumnType elementType) ->
                     "ARRAY[" + typeShape(elementType) + "]";
-            //CHECKSTYLE:OFF
             case ObjectType ot -> {
-                //CHECKSTYLE:ON
                 StringBuilder sb = new StringBuilder();
                 sb.append("OBJECT");
                 if (ot.isEmpty()) {
