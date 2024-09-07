@@ -433,7 +433,8 @@ public class CrateExperiments {
                 ResultSet rs = stmt.executeQuery(sql);
 
                 while (rs.next()) {
-                    LOGGER.error("Column details: {} {} {} {}", rs.getString("column_details"), rs.getString("column_name"), rs.getString("data_type"), rs.getString("table_schema"));
+                    LOGGER.error("Column details: {} {} {} {}", rs.getString("column_details"), rs.getString("column_name"), rs.getString("data_type"),
+                            rs.getString("table_schema"));
                 }
 
             }

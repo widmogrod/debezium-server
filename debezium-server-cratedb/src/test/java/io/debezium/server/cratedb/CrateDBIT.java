@@ -35,9 +35,9 @@ import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 
 /**
- * Integration test that verifies basic reading from PostgreSQL database and writing to Kinesis stream.
+ * Integration test that verifies basic reading from PostgreSQL database and writing to CrateDB stream.
  *
- * @author Jiri Pechanec
+ * @author Gabriel habryn
  */
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResourceLifecycleManager.class)

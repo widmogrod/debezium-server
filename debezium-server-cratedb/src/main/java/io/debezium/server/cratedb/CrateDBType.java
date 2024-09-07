@@ -224,7 +224,7 @@ public class CrateDBType {
             case BIGINT, DATE -> "i";
             case REAL -> "f";
             case TIME, TIMESTAMP, TIMESTAMPTZ, TIMESTAMPWOZ -> "ts";
-//            case BIT -> "b";
+            // case BIT -> "b";
             case ARRAY -> "arr_" + arrayOf.getShortName();
             case OBJECT -> "o";
             case GEO_POINT -> "p";
@@ -242,7 +242,7 @@ public class CrateDBType {
         TIMESTAMPTZ,
         TIMESTAMPWOZ,
         IP,
-        //        BIT,
+        // BIT,
         ARRAY,
         OBJECT,
         GEO_POINT;
@@ -251,4 +251,3 @@ public class CrateDBType {
     public static class EmptyArrayException extends RuntimeException {
     }
 }
-
