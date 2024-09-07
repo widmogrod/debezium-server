@@ -18,20 +18,21 @@ public class TypeCollision extends HashMap<ColumnType, ColumnInfo> {
             return;
         }
 
-        ColumnInfo nv = new ColumnInfo(
-                columnInfo.primaryKey(),
-                new ColumnName(columnInfo.columnName().columnName() + "_" + columnType.shortName()));
+
         if (containsKey(columnType)) {
             // Merge the column type with the existing one
             forEach((k, v) -> {
                 if (k.equals(columnType)) {
                     k.merge(columnType);
-                    this.put(k, nv);
+                    this.put(k, v);
                 }
             });
             return;
         }
 
+        ColumnInfo nv = new ColumnInfo(
+                columnInfo.primaryKey(),
+                new ColumnName(columnInfo.columnName().columnName() + "_" + columnType.shortName()));
         this.put(columnType, nv);
     }
 
