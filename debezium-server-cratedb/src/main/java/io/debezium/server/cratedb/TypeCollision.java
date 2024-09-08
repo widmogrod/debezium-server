@@ -18,7 +18,6 @@ public class TypeCollision extends HashMap<ColumnType, ColumnInfo> {
             return;
         }
 
-
         if (containsKey(columnType)) {
             // Merge the column type with the existing one
             forEach((k, v) -> {
