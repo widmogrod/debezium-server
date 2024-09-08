@@ -35,7 +35,7 @@ public record InformationSchemaColumnInfo(
         String dataType,
         String columnName,
         InformationSchemaColumnDetails columnDetails,
-        Boolean isPrimaryKey
+        Boolean isPrimaryKey,
 //        String columnDefault,
 //        String collationSchema,
 //        String collationName,
@@ -46,6 +46,63 @@ public record InformationSchemaColumnInfo(
 //        String characterSetName,
 //        String characterSetCatalog,
 //        Integer characterOctetLength,
-//        Integer characterMaximumLength
+        Integer characterMaximumLength
 ) {
+
+    public boolean isArray() {
+        return dataType.endsWith("_array");
+    }
+
+    public InformationSchemaColumnInfo subArray() {
+        return new InformationSchemaColumnInfo(
+                dataType.substring(0, dataType.length() - "_array".length()),
+                columnName,
+                columnDetails,
+                isPrimaryKey,
+                characterMaximumLength
+        );
+    }
+
+    public static class Builder {
+        private String dataType;
+        private String columnName;
+        private InformationSchemaColumnDetails columnDetails;
+        private Boolean isPrimaryKey = false;
+        private Integer characterMaximumLength = 0;
+
+        public Builder setDataType(String dataType) {
+            this.dataType = dataType;
+            return this;
+        }
+
+        public Builder setColumnName(String columnName) {
+            this.columnName = columnName;
+            return this;
+        }
+
+        public Builder setColumnDetails(InformationSchemaColumnDetails columnDetails) {
+            this.columnDetails = columnDetails;
+            return this;
+        }
+
+        public Builder setIsPrimaryKey(Boolean isPrimaryKey) {
+            this.isPrimaryKey = isPrimaryKey;
+            return this;
+        }
+
+        public Builder setCharacterMaximumLength(Integer characterMaximumLength) {
+            this.characterMaximumLength = characterMaximumLength;
+            return this;
+        }
+
+        public InformationSchemaColumnInfo build() {
+            return new InformationSchemaColumnInfo(
+                    dataType,
+                    columnName,
+                    columnDetails,
+                    isPrimaryKey,
+                    characterMaximumLength
+            );
+        }
+    }
 }

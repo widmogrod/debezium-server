@@ -5,7 +5,7 @@
  */
 package io.debezium.server.cratedb;
 
-public sealed interface ColumnType permits BigIntType, TextType, ArrayType, ObjectType {
+public sealed interface ColumnType permits ArrayType, BigIntType, BitType, BooleanType, CharType, FloatType, GeoShapeType, ObjectType, TextType, TimezType {
 
     String shortName();
 

@@ -29,16 +29,9 @@ public class ColumnTypeManager {
 
     private final ObjectType schema = new ObjectType();
 
-    public void fromInformationSchema(InformationSchemaColumnInfo[] columns) {
+    public void fromInformationSchema(List<InformationSchemaColumnInfo> columns) {
         for (InformationSchemaColumnInfo column : columns) {
-            ColumnType columnType = switch (column.dataType()) {
-                case "bigint" -> new BigIntType();
-                case "text" -> new TextType();
-                case "object" -> new ObjectType();
-                case "bigint_array" -> new ArrayType(new BigIntType());
-                default -> throw new IllegalArgumentException("Unknown data type: " + column.dataType());
-            };
-
+            ColumnType columnType = getColumnType(column);
             ColumnName columnName = ColumnName.normalized(column.columnName(), columnType);
 
             InformationSchemaColumnDetails detail = column.columnDetails();
@@ -62,6 +55,29 @@ public class ColumnTypeManager {
 
             schema.mergeColumn(columnName, columnType);
         }
+    }
+
+    private static ColumnType getColumnType(InformationSchemaColumnInfo column) {
+        ColumnType columnType = switch (column.dataType()) {
+            case "smallint", "bigint", "integer" -> new BigIntType();
+            case "double precision", "real" -> new FloatType();
+            case "timestamp with time zone", "timestamp without time zone" -> new TimezType();
+            case "bit" -> new BitType(column.characterMaximumLength());
+            case "ip", "text" -> new TextType();
+            case "object" -> new ObjectType();
+            case "boolean" -> new BooleanType();
+            case "character" -> new CharType(column.characterMaximumLength());
+            case "float_vector" -> new ArrayType(new FloatType());
+            case "geo_point", "geo_shape" -> new GeoShapeType();
+            default -> {
+                if (column.isArray()){
+                    yield new ArrayType(getColumnType(column.subArray()));
+                }
+
+                throw new IllegalArgumentException("Unknown data type: " + column.dataType());
+            }
+        };
+        return columnType;
     }
 
     public Object fromObject(Object o) {
@@ -278,6 +294,12 @@ public class ColumnTypeManager {
         return switch (c) {
             case BigIntType() -> "BIGINT";
             case TextType() -> "TEXT";
+            case BooleanType() -> "BOOLEAN";
+            case FloatType() -> "REAL";
+            case TimezType() -> "TIMETZ";
+            case GeoShapeType() -> "GEO_SHAPE";
+            case CharType(Number size) -> "CHAR(" + size + ")";
+            case BitType(Number size) -> "BIT(" + size + ")";
             case ArrayType(ColumnType elementType) -> "ARRAY[" + typeName(elementType) + "]";
             case ObjectType ot -> "OBJECT";
         };
@@ -287,6 +309,12 @@ public class ColumnTypeManager {
         return switch (c) {
             case BigIntType() -> typeName(c);
             case TextType() -> typeName(c);
+            case BooleanType() -> typeName(c);
+            case FloatType() -> typeName(c);
+            case TimezType() -> typeName(c);
+            case GeoShapeType() -> typeName(c);
+            case CharType(Number size) -> typeName(c);
+            case BitType(Number size) -> typeName(c);
             case ArrayType(ColumnType elementType) ->
                     "ARRAY[" + typeShape(elementType) + "]";
             case ObjectType ot -> {

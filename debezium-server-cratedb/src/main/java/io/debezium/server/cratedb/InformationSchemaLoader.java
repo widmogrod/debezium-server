@@ -23,6 +23,7 @@ public class InformationSchemaLoader {
             SELECT c.column_details
                  , c.column_name
                  , c.data_type
+                 , c.character_maximum_length
                  , IF(k.column_name IS NOT NULL, true, false) AS is_primary_key
             FROM information_schema.columns AS c
             LEFT JOIN information_schema.key_column_usage AS k
@@ -54,11 +55,9 @@ public class InformationSchemaLoader {
 
                     var details = mapper.readValue(json, InformationSchemaColumnDetails.class);
 
-                    var info = new InformationSchemaColumnInfo(
-                            resultSet.getString("data_type"),
-                            resultSet.getString("column_name"),
-                            details,
-                            resultSet.getBoolean("is_primary_key"));
+                    var info = new InformationSchemaColumnInfo.Builder().setColumnName(resultSet.getString("column_name")).setDataType(resultSet.getString("data_type"))
+                            .setColumnDetails(details).setIsPrimaryKey(resultSet.getBoolean("is_primary_key"))
+                            .setCharacterMaximumLength(resultSet.getInt("character_maximum_length")).build();
 
                     infos.add(info);
                 }

@@ -115,43 +115,35 @@ class ColumnTypeTest {
     void testInformationSchema() {
         ColumnTypeManager manager = new ColumnTypeManager();
 
-        InformationSchemaColumnInfo[] infos = new InformationSchemaColumnInfo[]{
-                new InformationSchemaColumnInfo(
-                        "text",
-                        "id",
-                        new InformationSchemaColumnDetails(
-                                "id",
-                                List.of()),
-                        true),
-                new InformationSchemaColumnInfo(
-                        "object",
-                        "doc",
-                        new InformationSchemaColumnDetails(
+        List<InformationSchemaColumnInfo> infos = List.of(
+                new InformationSchemaColumnInfo.Builder()
+                        .setDataType("object")
+                        .setColumnName("doc")
+                        .setColumnDetails(new InformationSchemaColumnDetails(
                                 "doc",
-                                List.of()),
-                        false),
-                new InformationSchemaColumnInfo(
-                        "text",
-                        "doc['name']",
-                        new InformationSchemaColumnDetails(
+                                List.of()))
+                        .build(),
+                new InformationSchemaColumnInfo.Builder()
+                        .setDataType("text")
+                        .setColumnName("doc['name']")
+                        .setColumnDetails(new InformationSchemaColumnDetails(
                                 "doc",
-                                List.of("name")),
-                        false),
-                new InformationSchemaColumnInfo(
-                        "bigint_array",
-                        "doc['name_bigint_array']",
-                        new InformationSchemaColumnDetails(
+                                List.of("name")))
+                        .build(),
+                new InformationSchemaColumnInfo.Builder()
+                        .setDataType("bigint_array")
+                        .setColumnName("doc['name_bigint_array']")
+                        .setColumnDetails(new InformationSchemaColumnDetails(
                                 "doc",
-                                List.of("name_bigint_array")),
-                        false),
-                new InformationSchemaColumnInfo(
-                        "bigint_array",
-                        "arr",
-                        new InformationSchemaColumnDetails(
+                                List.of("name_bigint_array")))
+                        .build(),
+                new InformationSchemaColumnInfo.Builder()
+                        .setDataType("bigint_array")
+                        .setColumnName("arr")
+                        .setColumnDetails(new InformationSchemaColumnDetails(
                                 "arr",
-                                List.of()),
-                        false),
-        };
+                                List.of()))
+                        .build());
 
         manager.fromInformationSchema(infos);
         manager.print();

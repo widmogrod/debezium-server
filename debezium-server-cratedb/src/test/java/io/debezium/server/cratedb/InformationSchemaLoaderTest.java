@@ -65,26 +65,36 @@ class InformationSchemaLoaderTest {
             for (InformationSchemaColumnInfo info : infos) {
                 LOGGER.info("{}", info);
             }
-            assertThat(infos.get(0)).isEqualTo(new InformationSchemaColumnInfo(
-                    "text", "id",
-                    new InformationSchemaColumnDetails("id", List.of()),
-                    true));
-            assertThat(infos.get(1)).isEqualTo(new InformationSchemaColumnInfo(
-                    "object", "doc",
-                    new InformationSchemaColumnDetails("doc", List.of()),
-                    false));
-            assertThat(infos.get(2)).isEqualTo(new InformationSchemaColumnInfo(
-                    "text", "doc['name']",
-                    new InformationSchemaColumnDetails("doc", List.of("name")),
-                    false));
-            assertThat(infos.get(3)).isEqualTo(new InformationSchemaColumnInfo(
-                    "bigint_array", "doc['name_bigint_array']",
-                    new InformationSchemaColumnDetails("doc", List.of("name_bigint_array")),
-                    false));
-            assertThat(infos.get(4)).isEqualTo(new InformationSchemaColumnInfo(
-                    "boolean", "doc['truth']",
-                    new InformationSchemaColumnDetails("doc", List.of("truth")),
-                    false));
+            assertThat(infos.get(0)).isEqualTo(new InformationSchemaColumnInfo.Builder()
+                    .setDataType("text")
+                    .setColumnName("id")
+                    .setColumnDetails(new InformationSchemaColumnDetails("id", List.of()))
+                    .setIsPrimaryKey(true)
+                    .build());
+
+            assertThat(infos.get(1)).isEqualTo(new InformationSchemaColumnInfo.Builder()
+                    .setDataType("object")
+                    .setColumnName("doc")
+                    .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of()))
+                    .build());
+
+            assertThat(infos.get(2)).isEqualTo(new InformationSchemaColumnInfo.Builder()
+                    .setDataType("text")
+                    .setColumnName("doc['name']")
+                    .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("name")))
+                    .build());
+
+            assertThat(infos.get(3)).isEqualTo(new InformationSchemaColumnInfo.Builder()
+                    .setDataType("bigint_array")
+                    .setColumnName("doc['name_bigint_array']")
+                    .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("name_bigint_array")))
+                    .build());
+
+            assertThat(infos.get(4)).isEqualTo(new InformationSchemaColumnInfo.Builder()
+                    .setDataType("boolean")
+                    .setColumnName("doc['truth']")
+                    .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("truth")))
+                    .build());
         });
     }
 }

@@ -422,6 +422,16 @@ public class CrateExperiments {
                 catch (Exception e) {
                     LOGGER.error("Error writing to CSV file: {}", e.getMessage());
                 }
+
+                var info = InformationSchemaLoader.withTableName("test").load(conn);
+
+                for (var elem : info) {
+                    LOGGER.error("Column details: {}", elem);
+                }
+
+                ColumnTypeManager manager = new ColumnTypeManager();
+                manager.fromInformationSchema(info);
+                manager.print();
             }
         });
 
