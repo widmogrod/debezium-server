@@ -6,16 +6,19 @@
 package io.debezium.server.cratedb;
 
 import java.util.HashMap;
+import java.util.Optional;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 public class TypeCollision extends HashMap<ColumnType, ColumnInfo> {
     public TypeCollision() {
         super();
     }
 
-    public void putType(ColumnType columnType, ColumnInfo columnInfo) {
+    public ColumnInfo putType(ColumnType columnType, ColumnInfo columnInfo) {
         if (this.isEmpty()) {
             this.put(columnType, columnInfo);
-            return;
+            return columnInfo;
         }
 
         if (containsKey(columnType)) {
@@ -26,16 +29,27 @@ public class TypeCollision extends HashMap<ColumnType, ColumnInfo> {
                     this.put(k, v);
                 }
             });
-            return;
+            return get(columnType);
         }
 
         ColumnInfo nv = new ColumnInfo(
                 columnInfo.primaryKey(),
                 new ColumnName(columnInfo.columnName().columnName() + "_" + columnType.shortName()));
         this.put(columnType, nv);
+        return nv;
     }
 
     public void mergeAll(TypeCollision typeCollision) {
         typeCollision.forEach(this::putType);
+    }
+
+    public Optional<Pair<ObjectType, ColumnInfo>> getObjectType() {
+        for (ColumnType columnType : keySet()) {
+            if (columnType instanceof ObjectType objectType) {
+                return Optional.of(Pair.of(objectType, get(columnType)));
+            }
+        }
+
+        return Optional.empty();
     }
 }

@@ -32,7 +32,11 @@ public record ColumnName(String columnName) {
 
     public static ColumnName normalized(String s, ColumnType columnType) {
         if (s.endsWith("_" + columnType.shortName())) {
-            return new ColumnName(s.substring(0, s.length() - columnType.shortName().length() -1));
+            String columnName = s.substring(0, s.length() - columnType.shortName().length() - 1);
+            // make sure that there is no accidental column name of the type matching the column type
+            if (!columnName.isEmpty()) {
+                return new ColumnName(s.substring(0, s.length() - columnType.shortName().length() -1));
+            }
         }
 
         return new ColumnName(s);

@@ -6,6 +6,9 @@
 package io.debezium.server.cratedb;
 
 import java.util.HashMap;
+import java.util.Optional;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 final public class ObjectType extends HashMap<ColumnName, TypeCollision> implements ColumnType {
     public ObjectType() {
@@ -13,12 +16,13 @@ final public class ObjectType extends HashMap<ColumnName, TypeCollision> impleme
     }
 
     public static ColumnType of(ColumnName name, ColumnType type) {
-        return new ObjectType().mergeColumn(name, type);
+        var result = new ObjectType();
+        result.mergeColumn(name, type);
+        return result;
     }
 
-    public ObjectType mergeColumn(ColumnName columnName, ColumnType columnType) {
-        this.computeIfAbsent(columnName, k -> new TypeCollision()).putType(columnType, new ColumnInfo(false, columnName));
-        return this;
+    public ColumnInfo mergeColumn(ColumnName columnName, ColumnType columnType) {
+        return this.computeIfAbsent(columnName, k -> new TypeCollision()).putType(columnType, new ColumnInfo(false, columnName));
     }
 
     @Override
@@ -28,8 +32,7 @@ final public class ObjectType extends HashMap<ColumnName, TypeCollision> impleme
 
     @Override
     public void merge(ColumnType columnType) {
-        if (columnType instanceof ObjectType) {
-            ObjectType other = (ObjectType) columnType;
+        if (columnType instanceof ObjectType other) {
             other.forEach((columnName, typeCollision) -> {
                 if (this.containsKey(columnName)) {
                     // merge type colision
@@ -51,5 +54,13 @@ final public class ObjectType extends HashMap<ColumnName, TypeCollision> impleme
     @Override
     public int hashCode() {
         return 1; // return same hash value for all instances
+    }
+
+    public Optional<Pair<ObjectType, ColumnInfo>> getObjectType(ColumnName columnName) {
+        if (containsKey(columnName)) {
+            return get(columnName).getObjectType();
+        }
+
+        return Optional.empty();
     }
 }

@@ -5,7 +5,28 @@
  */
 package io.debezium.server.cratedb;
 
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 public class ColumnTypeManager {
+    private static final DateTimeFormatter dateTimeFormatter = new DateTimeFormatterBuilder()
+            .append(DateTimeFormatter.ofPattern("[MM/dd/yyyy]" + "[dd-MM-yyyy]" + "[yyyy-MM-dd]")).append(DateTimeFormatter.ofPattern("[HH:mm:ss]")).toFormatter();
+    private static final String NUMBER_REGEX = "[+-]?(\\d+([.]\\d*)?(e[+-]?\\d+)?|[.]\\d+(e[+-]?\\d+)?)";
+    private static final String WHITESPACES_REGEX = "\\s*";
+    private static final String POINT_REGEX = "POINT";
+    private static final Pattern pointPattern = Pattern.compile(POINT_REGEX + WHITESPACES_REGEX + "\\(" + NUMBER_REGEX + WHITESPACES_REGEX + NUMBER_REGEX + "\\)");
+
     private final ObjectType schema = new ObjectType();
 
     public void fromInformationSchema(InformationSchemaColumnInfo[] columns) {
@@ -43,9 +64,214 @@ public class ColumnTypeManager {
         }
     }
 
-    public ColumnTypeManager addColumn(ColumnName columnName, ColumnType columnType) {
-        schema.mergeColumn(columnName, columnType);
-        return this;
+    public Object fromObject(Object o) {
+        return fromObject(o, schema);
+    }
+
+    public Object fromObject(Object o, ObjectType schema) {
+        // traverse object and update schema
+        // and use schema information to update object spec
+
+        return switch (o) {
+            case String x -> {
+                if (x.isEmpty()) {
+                    yield null;
+                }
+
+                ObjectMapper mapper = new ObjectMapper();
+                try {
+                    Object json = mapper.readValue(x, Object.class);
+                    yield fromObject(json);
+                }
+                catch (Exception ignored) {
+                    // DO nothing
+                }
+
+                try {
+                    OffsetDateTime time = OffsetDateTime.parse(x);
+                    yield time;
+                }
+                catch (Exception ignored) {
+                    // DO nothing
+                }
+
+                try {
+                    ZonedDateTime time = ZonedDateTime.parse(x);
+                    yield time;
+                }
+                catch (Exception ignored) {
+                    // DO nothing
+                }
+
+                try {
+                    LocalTime time = LocalTime.parse(x);
+                    yield time;
+                }
+                catch (Exception ignored) {
+                    // DO nothing
+                }
+
+                try {
+                    LocalDateTime time = LocalDateTime.parse(x);
+                    yield time;
+                }
+                catch (Exception ignored) {
+                    // DO nothing
+                }
+
+                yield x;
+            }
+            case Integer x -> x;
+            case List x -> {
+                if (x.isEmpty()) {
+                    yield null;
+                }
+
+                List<Object> result = new ArrayList<>();
+                for (Object value : x) {
+                    result.add(fromObject(value, schema));
+                }
+
+                yield result;
+            }
+
+            case Map x -> {
+                if (x.isEmpty()) {
+                    yield null;
+                }
+
+                Map<Object, Object> result = new LinkedHashMap<>();
+                for (Object key : x.keySet()) {
+                    Object value = x.get(key);
+                    // if is empty array, skip
+                    if (value instanceof List list && list.isEmpty()) {
+                        continue;
+                    }
+
+                    ObjectType columnType = new ObjectType();
+                    ColumnName columnName = ColumnName.normalized(key.toString(), columnType);
+                    var info = schema.getObjectType(columnName);
+                    if (info.isPresent()) {
+                        columnType = info.get().getLeft();
+                        columnName = info.get().getRight().columnName();
+                    } else {
+                        var info2 = schema.mergeColumn(columnName, detect(value));
+                        columnName = info2.columnName();
+                    }
+                    result.put(columnName.columnName(), fromObject(value, columnType));
+                }
+
+                yield result;
+            }
+            default -> throw new IllegalArgumentException("Unknown object type: " + o.getClass());
+        };
+    }
+
+    public ColumnType detect(Object o) {
+        return switch (o) {
+            case String x -> {
+                if (x.isEmpty()) {
+                    yield new TextType();
+                }
+
+                ObjectMapper mapper = new ObjectMapper();
+                try {
+                    Object json = mapper.readValue(x, Object.class);
+                    yield detect(json);
+                }
+                catch (Exception ignored) {
+                    // DO nothing
+                }
+
+                try {
+                    OffsetDateTime time = OffsetDateTime.parse(x);
+                    yield detect(time);
+                }
+                catch (Exception ignored) {
+                    // DO nothing
+                }
+
+                try {
+                    ZonedDateTime time = ZonedDateTime.parse(x);
+                    yield detect(time);
+                }
+                catch (Exception ignored) {
+                    // DO nothing
+                }
+
+                try {
+                    LocalTime time = LocalTime.parse(x);
+                    yield detect(time);
+                }
+                catch (Exception ignored) {
+                    // DO nothing
+                }
+
+                try {
+                    LocalDateTime time = LocalDateTime.parse(x);
+                    yield detect(time);
+                }
+                catch (Exception ignored) {
+                    // DO nothing
+                }
+
+//                Matcher pointMatcher = pointPattern.matcher(x);
+//                if (pointMatcher.matches()) {
+//                    yield new CrateDBType(CrateDBType.Type.GEO_POINT);
+//                }
+
+                yield new TextType();
+            }
+
+            case Integer x -> new BigIntType();
+            case Long x -> new BigIntType();
+//            case Float x -> new CrateDBType(CrateDBType.Type.REAL);
+//            case Double x -> new CrateDBType(CrateDBType.Type.REAL);
+//            case Boolean x -> new CrateDBType(CrateDBType.Type.BOOLEAN);
+//            case java.sql.Timestamp x -> new CrateDBType(CrateDBType.Type.TIMESTAMP);
+//            case java.time.Instant x -> new CrateDBType(CrateDBType.Type.TIMESTAMP);
+//            case java.time.OffsetDateTime x -> new CrateDBType(CrateDBType.Type.TIMESTAMPTZ);
+//            case java.time.ZonedDateTime x -> new CrateDBType(CrateDBType.Type.TIMESTAMPTZ);
+//            case java.time.LocalDateTime x -> new CrateDBType(CrateDBType.Type.TIMESTAMPWOZ);
+//            case java.time.LocalDate x -> new CrateDBType(CrateDBType.Type.DATE);
+//            case java.time.LocalTime x -> new CrateDBType(CrateDBType.Type.TIME);
+//            case java.net.InetAddress x -> new CrateDBType(CrateDBType.Type.IP);
+
+            case List x -> {
+                if (x.isEmpty()) {
+                    throw new RuntimeException("Empty array");
+                }
+
+                yield new ArrayType(detect(x.get(0)));
+            }
+
+            case Map x -> {
+                if (x.isEmpty()) {
+                    yield new ObjectType();
+                }
+
+                ColumnType result = new ObjectType();
+                for (Object key : x.keySet()) {
+                    ColumnName columnName = ColumnName.normalized(key.toString(), new ObjectType());
+                    // if is empty array, skip
+                    if (x.get(key) instanceof List list && list.isEmpty()) {
+                        continue;
+                    }
+
+                    ColumnType columnType = detect(x.get(key));
+                    ObjectType current = (ObjectType) ObjectType.of(columnName, columnType);
+                    result.merge(current);
+                }
+
+                yield result;
+            }
+
+            default -> throw new IllegalStateException("Unexpected value: " + o);
+        };
+    }
+
+    public ColumnInfo addColumn(ColumnName columnName, ColumnType columnType) {
+        return schema.mergeColumn(columnName, columnType);
     }
 
     public String typeName(ColumnType c) {
