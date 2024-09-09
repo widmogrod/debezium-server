@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static io.debezium.server.cratedb.ColumnTypeManager.extractNestedArrayTypes;
+import static io.debezium.server.cratedb.ColumnTypeManager.printAlterTable;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 class ColumnTypeTest {
@@ -148,6 +149,12 @@ class ColumnTypeTest {
         assertThat(nested).isEqualTo(Map.of(
                 List.of(new ColumnName("doc"), new ColumnName("poly_bigint_array_array")), new ArrayType(new ArrayType(new BigIntType())),
                 List.of(new ColumnName("doc"), new ColumnName("poly_object_array_array")), new ArrayType(new ArrayType(new ObjectType()))
+        ));
+
+        var alters = printAlterTable("test", nested);
+        assertThat(alters).isEqualTo(List.of(
+                "ALTER TABLE test ADD COLUMN doc['poly_object_array_array'] ARRAY(ARRAY(OBJECT))",
+                "ALTER TABLE test ADD COLUMN doc['poly_bigint_array_array'] ARRAY(ARRAY(BIGINT))"
         ));
     }
 

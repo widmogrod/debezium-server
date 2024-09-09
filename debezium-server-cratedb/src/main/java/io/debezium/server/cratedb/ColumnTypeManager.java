@@ -5,6 +5,9 @@
  */
 package io.debezium.server.cratedb;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.debezium.util.Strings;
+
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -12,9 +15,6 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
-import java.util.regex.Pattern;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ColumnTypeManager {
     private static final DateTimeFormatter dateTimeFormatter = new DateTimeFormatterBuilder()
@@ -59,21 +59,44 @@ public class ColumnTypeManager {
         };
     }
 
-//    public static List<String> printAlterTable(Map<List<ColumnName>, ArrayType> nestedArrays) {
-//        List<String> result = new ArrayList<>();
-//        for (var entry : nestedArrays.entrySet()) {
-//            var path = entry.getKey();
-//            var type = entry.getValue();
-//            // columns should be nested
-//            var column = path.get(path.size() - 1);
-//            var parent = path.subList(0, path.size() - 1);
-//            var parentName = parent.stream().map(ColumnName::columnName).reduce("", (a, b) -> a + "_" + b);
-//            var parentType = parent.stream().map(ColumnName::columnName).reduce("", (a, b) -> a + "." + b);
-//            var alter = "ALTER TABLE table_name ADD COLUMN " + parentName + " " + typeShape(type) + " AS " + parentType;
-//            result.add(alter);
-//        }
-//        return result;
-//    }
+    public static List<String> printAlterTable(String tableName, Map<List<ColumnName>, ArrayType> nestedArrays) {
+        List<String> result = new ArrayList<>();
+        for (var entry : nestedArrays.entrySet()) {
+            var path = entry.getKey();
+            var type = entry.getValue();
+            // columns should be nested
+            var column = colName(path);
+
+            var alter = "ALTER TABLE " + tableName + " ADD COLUMN " + column + " " + sqlColumnType(type);
+            result.add(alter);
+        }
+        return result;
+    }
+
+    public static String colName(List<ColumnName> path) {
+        if (path.size() > 1) {
+            // format to pattern col1['col2']['col3']
+            // skip first element
+            return path.subList(1, path.size()).stream().map(ColumnName::columnName).reduce(path.get(0).columnName(), (a, b) -> a + "['" + b + "']");
+        } else {
+            return  path.get(0).columnName();
+        }
+    }
+
+    public static String sqlColumnType(ColumnType columnType) {
+        return switch (columnType) {
+            case BigIntType() -> "BIGINT";
+            case TextType() -> "TEXT";
+            case BooleanType() -> "BOOLEAN";
+            case FloatType() -> "REAL";
+            case TimezType() -> "TIMETZ";
+            case GeoShapeType() -> "GEO_SHAPE";
+            case CharType(Number size) -> "CHAR(" + size + ")";
+            case BitType(Number size) -> "BIT(" + size + ")";
+            case ArrayType(ColumnType elementType) -> "ARRAY(" + sqlColumnType(elementType) + ")";
+            case ObjectType ot -> "OBJECT";
+        };
+    }
 
     public void fromInformationSchema(List<InformationSchemaColumnInfo> columns) {
         for (InformationSchemaColumnInfo column : columns) {
@@ -142,15 +165,13 @@ public class ColumnTypeManager {
                     if (!isLast) {
                         if (currentColumnType instanceof ObjectType ot) {
                             parentType = ot;
-                        }
-                        else {
+                        } else {
                             parentType = new ObjectType();
                         }
                     }
                 }
                 schema.putColumnNameWithType2(columnName, rootType);
-            }
-            else {
+            } else {
                 schema.putColumnNameWithType2(columnName, columnType);
             }
         }
@@ -330,8 +351,7 @@ public class ColumnTypeManager {
                         k = new ArrayType(k);
                         if (result.containsKey(k)) {
                             result.get(k).addAll(v);
-                        }
-                        else {
+                        } else {
                             result.put(k, v);
                         }
                     });
@@ -343,8 +363,7 @@ public class ColumnTypeManager {
             columnType = new ArrayType(columnType);
             if (result.containsKey(columnType)) {
                 result.get(columnType).add(o);
-            }
-            else {
+            } else {
                 List<Object> newList = new ArrayList<>();
                 newList.add(o);
                 result.put(columnType, newList);
@@ -491,31 +510,16 @@ public class ColumnTypeManager {
         throw new IllegalArgumentException("Column not found: " + columnName);
     }
 
-    public String typeName(ColumnType c) {
-        return switch (c) {
-            case BigIntType() -> "BIGINT";
-            case TextType() -> "TEXT";
-            case BooleanType() -> "BOOLEAN";
-            case FloatType() -> "REAL";
-            case TimezType() -> "TIMETZ";
-            case GeoShapeType() -> "GEO_SHAPE";
-            case CharType(Number size) -> "CHAR(" + size + ")";
-            case BitType(Number size) -> "BIT(" + size + ")";
-            case ArrayType(ColumnType elementType) -> "ARRAY[" + typeName(elementType) + "]";
-            case ObjectType ot -> "OBJECT";
-        };
-    }
-
     public String typeShape(ColumnType c) {
         return switch (c) {
-            case BigIntType() -> typeName(c);
-            case TextType() -> typeName(c);
-            case BooleanType() -> typeName(c);
-            case FloatType() -> typeName(c);
-            case TimezType() -> typeName(c);
-            case GeoShapeType() -> typeName(c);
-            case CharType(Number size) -> typeName(c);
-            case BitType(Number size) -> typeName(c);
+            case BigIntType() -> sqlColumnType(c);
+            case TextType() -> sqlColumnType(c);
+            case BooleanType() -> sqlColumnType(c);
+            case FloatType() -> sqlColumnType(c);
+            case TimezType() -> sqlColumnType(c);
+            case GeoShapeType() -> sqlColumnType(c);
+            case CharType(Number size) -> sqlColumnType(c);
+            case BitType(Number size) -> sqlColumnType(c);
             case ArrayType(ColumnType elementType) -> "ARRAY[" + typeShape(elementType) + "]";
             case ObjectType ot -> {
                 StringBuilder sb = new StringBuilder();
@@ -530,7 +534,7 @@ public class ColumnTypeManager {
                     sb.append(k.columnName()).append(": {\n");
                     v.forEach((k2, v2) -> {
                         sb.append("\t\t");
-                        sb.append(typeName(k2));
+                        sb.append(sqlColumnType(k2));
 
                         // column info
                         sb.append(": {primaryKey: ");
