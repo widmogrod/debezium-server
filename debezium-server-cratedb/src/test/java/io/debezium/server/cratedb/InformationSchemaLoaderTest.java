@@ -131,17 +131,35 @@ class InformationSchemaLoaderTest {
                     Object object = generateObject();
                     generated.add(object);
 
+                    LOGGER.error("BEFORE: {}", object);
+
                     Object normalizedObject = manager1.fromObject(object, manager1.getObjectType(new ColumnName("doc")));
+
+                    var nested = manager1.extractNestedArrayTypes(manager1.getSchema());
+                    var alters = manager1.printAlterTable("test", nested);
+                    for (String alter : alters) {
+                        LOGGER.error("ALTER: {}", alter);
+                        try (Statement stmt2 = conn.createStatement()) {
+                            try {
+                                stmt2.execute(alter);
+                            }
+                            catch (Exception e) {
+                                LOGGER.error("ALTER EXCEPTION {}", e.getMessage());
+                            }
+                            stmt2.execute("REFRESH TABLE test");
+                        }
+                    }
 
                     String json = mapper.writeValueAsString(normalizedObject);
 
-                    LOGGER.error("{}", json);
+                    LOGGER.error("POST: {}", json);
                     stmt.setString(1, String.valueOf(i));
                     stmt.setString(2, json);
                     try {
                         stmt.execute();
                     }
                     catch (Exception e) {
+                        LOGGER.error("BEFORE EXCEPTION:");
                         manager1.print();
                         throw e;
                     }

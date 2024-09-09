@@ -137,7 +137,7 @@ class ColumnTypeTest {
                                 Map.of("id1", 1, "name1", "Jon")))));
         manager.print();
 
-        assertThat(result).isEqualTo( Map.of("doc", Map.of(
+        assertThat(result).isEqualTo(Map.of("doc", Map.of(
                 "poly", List.of(1),
                 "poly_boolean_array", List.of(false),
                 "poly_real_array", List.of(-2.3),
@@ -185,6 +185,26 @@ class ColumnTypeTest {
 
         Object r1 = manager.fromObject(o1);
         manager.print();
+    }
+
+    @Test
+    void err3() throws JsonProcessingException {
+        ObjectMapper mapper = new ObjectMapper();
+        ColumnTypeManager manager = new ColumnTypeManager();
+
+        Object o1 = mapper.readValue("""
+                {"name_boolean":"Queen"}""", Object.class);
+        Object o2 = mapper.readValue("""
+                {"name_boolean":true}""", Object.class);
+
+        Object r1 = manager.fromObject(o1);
+        manager.print();
+
+        assertThat(r1).isEqualTo(Map.of("name_boolean", "Queen"));
+
+        Object r2 = manager.fromObject(o2);
+        manager.print();
+        assertThat(r2).isEqualTo(Map.of("name_boolean_boolean", true));
     }
 
     @Test

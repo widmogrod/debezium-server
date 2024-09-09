@@ -35,12 +35,17 @@ public record ColumnName(String columnName) {
         return columnName.hashCode();
     }
 
+    public static ColumnName of(Object s) {
+        return new ColumnName(s.toString());
+    }
+
     public static ColumnName normalized(String s, ColumnType columnType) {
-        if (s.endsWith("_" + columnType.shortName())) {
-            String columnName = s.substring(0, s.length() - columnType.shortName().length() - 1);
+        var suffix = "_" + columnType.shortName();
+        if (s.endsWith(suffix)) {
+            String columnName = s.substring(0, s.length() - suffix.length());
             // make sure that there is no accidental column name of the type matching the column type
             if (!columnName.isEmpty()) {
-                return new ColumnName(s.substring(0, s.length() - columnType.shortName().length() - 1));
+                return new ColumnName(columnName);
             }
         }
 

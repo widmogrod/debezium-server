@@ -286,7 +286,7 @@ public class ColumnTypeManager {
                             for (var split : splits.entrySet()) {
                                 var value2 = split.getValue();
                                 ColumnType columnType = split.getKey();
-                                ColumnName columnName2 = ColumnName.normalized(key.toString(), columnType);
+                                ColumnName columnName2 = ColumnName.of(key);
                                 var info = schema.putColumnNameWithType2(columnName2, columnType);
 
                                 if (info.getLeft() instanceof ObjectType oo) {
@@ -303,7 +303,7 @@ public class ColumnTypeManager {
                     }
 
                     ColumnType columnType2 = detect(value);
-                    ColumnName columnName2 = ColumnName.normalized(key.toString(), columnType2);
+                    ColumnName columnName2 = ColumnName.of(key.toString());
                     var info = schema.putColumnNameWithType2(columnName2, columnType2);
 
                     if (info.getLeft() instanceof ObjectType oo) {
