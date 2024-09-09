@@ -15,14 +15,56 @@ final public class ObjectType extends HashMap<ColumnName, TypeCollision> impleme
         super();
     }
 
-    public static ColumnType of(ColumnName name, ColumnType type) {
+    public static ObjectType of(ColumnName name, ColumnType type) {
         var result = new ObjectType();
-        result.mergeColumn(name, type);
+        result.putColumnNameWithType(name, type);
         return result;
     }
 
-    public ColumnInfo mergeColumn(ColumnName columnName, ColumnType columnType) {
-        return this.computeIfAbsent(columnName, k -> new TypeCollision()).putType(columnType, new ColumnInfo(false, columnName));
+    @Deprecated
+    public ColumnInfo putColumnNameWithType(ColumnName columnName, ColumnType columnType) {
+        return this
+                .computeIfAbsent(columnName, k -> new TypeCollision())
+                .putType(columnType, new ColumnInfo(false, columnName));
+    }
+
+    public Pair<ColumnType, ColumnInfo> putColumnNameWithType2(ColumnName columnName, ColumnType columnType) {
+        return this
+                .computeIfAbsent(columnName, k -> new TypeCollision())
+                .putType2(columnType, new ColumnInfo(false, columnName));
+    }
+
+    @Deprecated
+    public Optional<Pair<ObjectType, ColumnInfo>> tryGetColumnInfoOfObjectType(ColumnName columnName) {
+        if (containsKey(columnName)) {
+            return get(columnName).tryGetColumInfoOfObjectType();
+        }
+
+        return Optional.empty();
+    }
+
+    public Optional<Pair<ColumnType, ColumnInfo>> tryGetColumnInfoOf(ColumnName columnName, ColumnType columnType) {
+        if (containsKey(columnName)) {
+            return get(columnName).tryGetColumInfoOf(columnType);
+        }
+
+        return Optional.empty();
+    }
+
+    public Optional<Pair<ColumnType, ColumnInfo>> tryGetColumnNamed(ColumnName columnName) {
+        for (var entry : entrySet()) {
+            var key = entry.getKey();
+            var value = entry.getValue();
+            for (var tc : value.entrySet()) {
+                var k = tc.getKey();
+                var v = tc.getValue();
+                if (v.columnName().equals(columnName)) {
+                    return Optional.of(Pair.of(k, v));
+                }
+            }
+        }
+
+        return Optional.empty();
     }
 
     @Override
@@ -35,7 +77,7 @@ final public class ObjectType extends HashMap<ColumnName, TypeCollision> impleme
         if (columnType instanceof ObjectType other) {
             other.forEach((columnName, typeCollision) -> {
                 if (this.containsKey(columnName)) {
-                    // merge type colision
+                    // merge type collision
                     this.get(columnName).mergeAll(typeCollision);
                 }
                 else {
@@ -54,13 +96,5 @@ final public class ObjectType extends HashMap<ColumnName, TypeCollision> impleme
     @Override
     public int hashCode() {
         return 1; // return same hash value for all instances
-    }
-
-    public Optional<Pair<ObjectType, ColumnInfo>> getObjectType(ColumnName columnName) {
-        if (containsKey(columnName)) {
-            return get(columnName).getObjectType();
-        }
-
-        return Optional.empty();
     }
 }

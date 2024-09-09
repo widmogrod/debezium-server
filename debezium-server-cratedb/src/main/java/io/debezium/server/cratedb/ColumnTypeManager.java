@@ -32,33 +32,86 @@ public class ColumnTypeManager {
     public void fromInformationSchema(List<InformationSchemaColumnInfo> columns) {
         for (InformationSchemaColumnInfo column : columns) {
             ColumnType columnType = getColumnType(column);
-            ColumnName columnName = ColumnName.normalized(column.columnName(), columnType);
 
             InformationSchemaColumnDetails detail = column.columnDetails();
+            ColumnName columnName = ColumnName.normalized(detail.name(), columnType);
+
             if (!detail.path().isEmpty()) {
-                ColumnType parentType = new ObjectType();
-                columnName = ColumnName.normalized(detail.name(), parentType);
+                ObjectType rootType = new ObjectType();
+                var info = schema.tryGetColumnNamed(columnName);
+                if (!info.isEmpty()) {
+                    if (info.get().getLeft() instanceof ObjectType ot) {
+                        rootType = ot;
+                    }
+                }
+
+                ObjectType parentType = rootType;
+                var length = detail.path().size();
                 for (String path : detail.path()) {
+                    length--;
+
                     ColumnType currentColumnType = new ObjectType();
+                    ColumnName currentColumnName = null;
+
+                    // check if currentColumn name prefix match any of parentType column names
+                    // and if to take the column type from the parentType
+                    for (var entry : parentType.entrySet()) {
+                        var key = entry.getKey();
+                        if (path.startsWith(key.columnName() + "_")) {
+                            var cleanPath = path.substring(0, key.columnName().length());
+                            var info3 = parentType.tryGetColumnNamed(new ColumnName(cleanPath));
+                            if (!info3.isEmpty()) {
+                                currentColumnName = info3.get().getRight().columnName();
+                                break;
+                            }
+                        }
+                    }
+
                     // if is last then take the column type from the column
-                    if (path.equals(detail.path().get(detail.path().size() - 1))) {
+                    boolean isLast = length == 0;
+                    if (isLast) {
                         currentColumnType = columnType;
                     }
 
-                    ColumnName currentColumnName = ColumnName.normalized(path, currentColumnType);
-                    ObjectType current = (ObjectType) ObjectType.of(currentColumnName, currentColumnType);
-                    parentType.merge(current);
-                    parentType = current;
-                }
-                columnType = parentType;
-            }
+                    if (currentColumnName == null) {
+                        currentColumnName = ColumnName.normalized(path, currentColumnType);
+                    }
 
-            schema.mergeColumn(columnName, columnType);
+                    var info2 = parentType.tryGetColumnNamed(ColumnName.normalized(path, currentColumnType));
+                    // var info2 = parentType.tryGetColumnInfoOf(ColumnName.normalized(path, currentColumnType), currentColumnType);
+                    if (!info2.isEmpty()) {
+                        currentColumnType = info2.get().getLeft();
+                    }
+
+                    if (currentColumnType instanceof ArrayType at) {
+                        if (at.elementType() instanceof ObjectType ot) {
+                            parentType.putColumnNameWithType2(currentColumnName, at);
+                            parentType = ot;
+                            continue;
+                        }
+                    }
+
+                    // ObjectType current = ObjectType.of(currentColumnName, currentColumnType);
+                    parentType.putColumnNameWithType2(currentColumnName, currentColumnType);
+                    if (!isLast) {
+                        if (currentColumnType instanceof ObjectType ot) {
+                            parentType = ot;
+                        }
+                        else {
+                            parentType = new ObjectType();
+                        }
+                    }
+                }
+                schema.putColumnNameWithType2(columnName, rootType);
+            }
+            else {
+                schema.putColumnNameWithType2(columnName, columnType);
+            }
         }
     }
 
     private static ColumnType getColumnType(InformationSchemaColumnInfo column) {
-        ColumnType columnType = switch (column.dataType()) {
+        return switch (column.dataType()) {
             case "smallint", "bigint", "integer" -> new BigIntType();
             case "double precision", "real" -> new FloatType();
             case "timestamp with time zone", "timestamp without time zone" -> new TimezType();
@@ -70,14 +123,13 @@ public class ColumnTypeManager {
             case "float_vector" -> new ArrayType(new FloatType());
             case "geo_point", "geo_shape" -> new GeoShapeType();
             default -> {
-                if (column.isArray()){
+                if (column.isArray()) {
                     yield new ArrayType(getColumnType(column.subArray()));
                 }
 
                 throw new IllegalArgumentException("Unknown data type: " + column.dataType());
             }
         };
-        return columnType;
     }
 
     public Object fromObject(Object o) {
@@ -97,49 +149,44 @@ public class ColumnTypeManager {
                 ObjectMapper mapper = new ObjectMapper();
                 try {
                     Object json = mapper.readValue(x, Object.class);
-                    yield fromObject(json);
-                }
-                catch (Exception ignored) {
+                    yield fromObject(json, schema);
+                } catch (Exception ignored) {
                     // DO nothing
                 }
 
                 try {
                     OffsetDateTime time = OffsetDateTime.parse(x);
                     yield time;
-                }
-                catch (Exception ignored) {
+                } catch (Exception ignored) {
                     // DO nothing
                 }
 
                 try {
                     ZonedDateTime time = ZonedDateTime.parse(x);
                     yield time;
-                }
-                catch (Exception ignored) {
+                } catch (Exception ignored) {
                     // DO nothing
                 }
 
                 try {
                     LocalTime time = LocalTime.parse(x);
                     yield time;
-                }
-                catch (Exception ignored) {
+                } catch (Exception ignored) {
                     // DO nothing
                 }
 
                 try {
                     LocalDateTime time = LocalDateTime.parse(x);
                     yield time;
-                }
-                catch (Exception ignored) {
+                } catch (Exception ignored) {
                     // DO nothing
                 }
 
                 yield x;
             }
-            case Integer x -> x;
+
             case List x -> {
-                if (x.isEmpty()) {
+                if (isEmptyList(x)) {
                     yield null;
                 }
 
@@ -159,28 +206,114 @@ public class ColumnTypeManager {
                 Map<Object, Object> result = new LinkedHashMap<>();
                 for (Object key : x.keySet()) {
                     Object value = x.get(key);
-                    // if is empty array, skip
-                    if (value instanceof List list && list.isEmpty()) {
+                    if (isEmptyList(value)) {
                         continue;
                     }
 
-                    ObjectType columnType = new ObjectType();
-                    ColumnName columnName = ColumnName.normalized(key.toString(), columnType);
-                    var info = schema.getObjectType(columnName);
-                    if (info.isPresent()) {
-                        columnType = info.get().getLeft();
-                        columnName = info.get().getRight().columnName();
-                    } else {
-                        var info2 = schema.mergeColumn(columnName, detect(value));
-                        columnName = info2.columnName();
+                    // if is empty array, skip
+                    if (value instanceof List<?> list) {
+                        if (isPolyList(list)) {
+                            // split list by types into multiple columns
+                            var splits = splitByType(list);
+
+                            for (var split : splits.entrySet()) {
+                                var value2 = split.getValue();
+                                ColumnType columnType = split.getKey();
+                                ColumnName columnName2 = ColumnName.normalized(key.toString(), columnType);
+                                var info = schema.putColumnNameWithType2(columnName2, columnType);
+
+                                if (info.getLeft() instanceof ObjectType oo) {
+                                    var val = fromObject(value2, oo);
+                                    result.put(info.getRight().columnName().columnName(), val);
+                                } else {
+                                    // most likely here we deal with primitive type
+                                    var val = fromObject(value2, new ObjectType());
+                                    result.put(info.getRight().columnName().columnName(), val);
+                                }
+                            }
+                            continue;
+                        }
                     }
-                    result.put(columnName.columnName(), fromObject(value, columnType));
+
+                    ColumnType columnType2 = detect(value);
+                    ColumnName columnName2 = ColumnName.normalized(key.toString(), columnType2);
+                    var info = schema.putColumnNameWithType2(columnName2, columnType2);
+
+                    if (info.getLeft() instanceof ObjectType oo) {
+                        var val = fromObject(value, oo);
+                        result.put(info.getRight().columnName().columnName(), val);
+                    } else {
+                        // most likely here we deal with primitive type
+                        var val = fromObject(value, new ObjectType());
+                        result.put(info.getRight().columnName().columnName(), val);
+                    }
                 }
 
                 yield result;
             }
-            default -> throw new IllegalArgumentException("Unknown object type: " + o.getClass());
+            default -> o;
         };
+    }
+
+    private static boolean isEmptyList(Object list) {
+        if (!(list instanceof List<?>)) {
+            return false;
+        }
+
+        while (list instanceof List<?> l) {
+            if (l.isEmpty()) {
+                return true;
+            }
+
+            list = l.get(0);
+        }
+
+        return false;
+    }
+
+    private Map<ColumnType, List<Object>> splitByType(List<?> list) {
+        Map<ColumnType, List<Object>> result = new LinkedHashMap<>();
+        for (Object o : list) {
+            if (o instanceof List<?> l) {
+                if (isEmptyList(o)) {
+                    continue;
+                }
+
+                if (isPolyList(o)) {
+                    splitByType(l).forEach((k, v) -> {
+                        k = new ArrayType(k);
+                        if (result.containsKey(k)) {
+                            result.get(k).addAll(v);
+                        }
+                        else {
+                            result.put(k, v);
+                        }
+                    });
+                    continue;
+                }
+            }
+
+            ColumnType columnType = detect(o);
+            columnType = new ArrayType(columnType);
+            if (result.containsKey(columnType)) {
+                result.get(columnType).add(o);
+            }
+            else {
+                List<Object> newList = new ArrayList<>();
+                newList.add(o);
+                result.put(columnType, newList);
+            }
+        }
+
+        return result;
+    }
+
+    private boolean isPolyList(Object o) {
+        if (o instanceof List<?> list) {
+            return list.stream().anyMatch(x -> !x.getClass().equals(list.get(0).getClass()));
+        }
+
+        return false;
     }
 
     public ColumnType detect(Object o) {
@@ -194,40 +327,35 @@ public class ColumnTypeManager {
                 try {
                     Object json = mapper.readValue(x, Object.class);
                     yield detect(json);
-                }
-                catch (Exception ignored) {
+                } catch (Exception ignored) {
                     // DO nothing
                 }
 
                 try {
                     OffsetDateTime time = OffsetDateTime.parse(x);
                     yield detect(time);
-                }
-                catch (Exception ignored) {
+                } catch (Exception ignored) {
                     // DO nothing
                 }
 
                 try {
                     ZonedDateTime time = ZonedDateTime.parse(x);
                     yield detect(time);
-                }
-                catch (Exception ignored) {
+                } catch (Exception ignored) {
                     // DO nothing
                 }
 
                 try {
                     LocalTime time = LocalTime.parse(x);
                     yield detect(time);
-                }
-                catch (Exception ignored) {
+                } catch (Exception ignored) {
                     // DO nothing
                 }
 
                 try {
                     LocalDateTime time = LocalDateTime.parse(x);
                     yield detect(time);
-                }
-                catch (Exception ignored) {
+                } catch (Exception ignored) {
                     // DO nothing
                 }
 
@@ -241,21 +369,25 @@ public class ColumnTypeManager {
 
             case Integer x -> new BigIntType();
             case Long x -> new BigIntType();
-//            case Float x -> new CrateDBType(CrateDBType.Type.REAL);
-//            case Double x -> new CrateDBType(CrateDBType.Type.REAL);
-//            case Boolean x -> new CrateDBType(CrateDBType.Type.BOOLEAN);
-//            case java.sql.Timestamp x -> new CrateDBType(CrateDBType.Type.TIMESTAMP);
-//            case java.time.Instant x -> new CrateDBType(CrateDBType.Type.TIMESTAMP);
-//            case java.time.OffsetDateTime x -> new CrateDBType(CrateDBType.Type.TIMESTAMPTZ);
-//            case java.time.ZonedDateTime x -> new CrateDBType(CrateDBType.Type.TIMESTAMPTZ);
-//            case java.time.LocalDateTime x -> new CrateDBType(CrateDBType.Type.TIMESTAMPWOZ);
-//            case java.time.LocalDate x -> new CrateDBType(CrateDBType.Type.DATE);
-//            case java.time.LocalTime x -> new CrateDBType(CrateDBType.Type.TIME);
-//            case java.net.InetAddress x -> new CrateDBType(CrateDBType.Type.IP);
+            case Boolean x -> new BooleanType();
+            case Float x -> new FloatType();
+            case Double x -> new FloatType();
+            case java.sql.Timestamp x -> new TimezType();
+            case java.time.Instant x -> new TimezType();
+            case java.time.OffsetDateTime x -> new TimezType();
+            case java.time.ZonedDateTime x -> new TimezType();
+            case java.time.LocalDateTime x -> new TimezType();
+            case java.time.LocalDate x -> new TimezType();
+            case java.time.LocalTime x -> new TimezType();
+            case java.net.InetAddress x -> new TextType();
 
             case List x -> {
-                if (x.isEmpty()) {
+                if (isEmptyList(x)) {
                     throw new RuntimeException("Empty array");
+                }
+
+                if (isPolyList(x)) {
+                    throw new RuntimeException("Mixed array");
                 }
 
                 yield new ArrayType(detect(x.get(0)));
@@ -270,12 +402,12 @@ public class ColumnTypeManager {
                 for (Object key : x.keySet()) {
                     ColumnName columnName = ColumnName.normalized(key.toString(), new ObjectType());
                     // if is empty array, skip
-                    if (x.get(key) instanceof List list && list.isEmpty()) {
+                    if (isEmptyList(x.get(key))) {
                         continue;
                     }
 
-                    ColumnType columnType = detect(x.get(key));
-                    ObjectType current = (ObjectType) ObjectType.of(columnName, columnType);
+                    ColumnType valueType = detect(x.get(key));
+                    ObjectType current = (ObjectType) ObjectType.of(columnName, valueType);
                     result.merge(current);
                 }
 
@@ -287,7 +419,20 @@ public class ColumnTypeManager {
     }
 
     public ColumnInfo addColumn(ColumnName columnName, ColumnType columnType) {
-        return schema.mergeColumn(columnName, columnType);
+        return schema.putColumnNameWithType(columnName, columnType);
+    }
+
+    public void putCollision(ColumnName name, TypeCollision collision) {
+        this.schema.put(name, collision);
+    }
+
+    public ObjectType getObjectType(ColumnName columnName) {
+        var result = schema.tryGetColumnInfoOfObjectType(columnName);
+        if (result.isPresent()) {
+            return result.get().getLeft();
+        }
+
+        throw new IllegalArgumentException("Column not found: " + columnName);
     }
 
     public String typeName(ColumnType c) {
@@ -315,8 +460,7 @@ public class ColumnTypeManager {
             case GeoShapeType() -> typeName(c);
             case CharType(Number size) -> typeName(c);
             case BitType(Number size) -> typeName(c);
-            case ArrayType(ColumnType elementType) ->
-                    "ARRAY[" + typeShape(elementType) + "]";
+            case ArrayType(ColumnType elementType) -> "ARRAY[" + typeShape(elementType) + "]";
             case ObjectType ot -> {
                 StringBuilder sb = new StringBuilder();
                 sb.append("OBJECT");
@@ -374,9 +518,5 @@ public class ColumnTypeManager {
 
     public void print() {
         System.out.println(typeShape(schema));
-    }
-
-    public void putCollision(ColumnName name, TypeCollision collision) {
-        this.schema.put(name, collision);
     }
 }
