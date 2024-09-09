@@ -35,8 +35,10 @@ public class ColumnTypeManager {
             case ObjectType ot -> {
                 Map<List<ColumnName>, ArrayType> result = new HashMap<>();
                 for (var entry : ot.entrySet()) {
+                    // iterate over type collisions
                     for (var type : entry.getValue().entrySet()) {
                         var newPath = new ArrayList<>(path);
+                        // get unique column name instead of field name
                         newPath.add(type.getValue().columnName());
 
                         var nested = extractNestedArrayTypes(newPath, type.getKey());
@@ -47,8 +49,8 @@ public class ColumnTypeManager {
             }
             case ArrayType at -> switch (at.elementType()) {
                 case ArrayType at2 -> {
-                    var nested = extractNestedArrayTypes(path, at2);
-                    nested.putAll(Map.of(path, at));
+                    var nested = extractNestedArrayTypes(new ArrayList<>(path), at2);
+                    nested.put(path, at);
                     yield nested;
                 }
                 default -> new HashMap<>();
@@ -56,6 +58,22 @@ public class ColumnTypeManager {
             default -> new HashMap<>();
         };
     }
+
+//    public static List<String> printAlterTable(Map<List<ColumnName>, ArrayType> nestedArrays) {
+//        List<String> result = new ArrayList<>();
+//        for (var entry : nestedArrays.entrySet()) {
+//            var path = entry.getKey();
+//            var type = entry.getValue();
+//            // columns should be nested
+//            var column = path.get(path.size() - 1);
+//            var parent = path.subList(0, path.size() - 1);
+//            var parentName = parent.stream().map(ColumnName::columnName).reduce("", (a, b) -> a + "_" + b);
+//            var parentType = parent.stream().map(ColumnName::columnName).reduce("", (a, b) -> a + "." + b);
+//            var alter = "ALTER TABLE table_name ADD COLUMN " + parentName + " " + typeShape(type) + " AS " + parentType;
+//            result.add(alter);
+//        }
+//        return result;
+//    }
 
     public void fromInformationSchema(List<InformationSchemaColumnInfo> columns) {
         for (InformationSchemaColumnInfo column : columns) {
@@ -426,7 +444,7 @@ public class ColumnTypeManager {
                     yield new ObjectType();
                 }
 
-                ColumnType result = new ObjectType();
+                ObjectType result = new ObjectType();
                 for (Object key : x.keySet()) {
                     ColumnName columnName = ColumnName.normalized(key.toString(), new ObjectType());
                     // if is empty array, skip
@@ -434,8 +452,18 @@ public class ColumnTypeManager {
                         continue;
                     }
 
+                    if (isPolyList(x.get(key))) {
+                        var splits = splitByType((List<?>) x.get(key));
+                        for (var split : splits.entrySet()) {
+                            ColumnType columnType = split.getKey();
+                            ColumnName columnName2 = ColumnName.normalized(key.toString(), columnType);
+                            result.putColumnNameWithType2(columnName2, columnType);
+                        }
+                        continue;
+                    }
+
                     ColumnType valueType = detect(x.get(key));
-                    ObjectType current = (ObjectType) ObjectType.of(columnName, valueType);
+                    ObjectType current = ObjectType.of(columnName, valueType);
                     result.merge(current);
                 }
 

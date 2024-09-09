@@ -5,18 +5,17 @@
  */
 package io.debezium.server.cratedb;
 
-import static io.debezium.server.cratedb.ColumnTypeManager.extractNestedArrayTypes;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.lang3.tuple.Pair;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.junit.jupiter.api.Test;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import static io.debezium.server.cratedb.ColumnTypeManager.extractNestedArrayTypes;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 class ColumnTypeTest {
     @Test
@@ -127,27 +126,28 @@ class ColumnTypeTest {
     @Test
     void polyLists() {
         ColumnTypeManager manager = new ColumnTypeManager();
-        Object result = manager.fromObject(Map.of(
-                "poly", List.of(
-                        1,
-                        false,
-                        -2.3,
-                        List.of(1, Map.of("id2", 1, "name2", "Jon"), 3),
-                        Map.of("id1", 1, "name1", "Jon"))));
+        Object result = manager.fromObject(
+                Map.of("doc", Map.of(
+                        "poly", List.of(
+                                1,
+                                false,
+                                -2.3,
+                                List.of(1, Map.of("id2", 1, "name2", "Jon"), 3),
+                                Map.of("id1", 1, "name1", "Jon")))));
         manager.print();
 
-        assertThat(result).isEqualTo(Map.of(
+        assertThat(result).isEqualTo( Map.of("doc", Map.of(
                 "poly", List.of(1),
                 "poly_boolean_array", List.of(false),
                 "poly_real_array", List.of(-2.3),
                 "poly_bigint_array_array", List.of(1, 3),
                 "poly_object_array_array", List.of(Map.of("id2", 1, "name2", "Jon")),
-                "poly_object_array", List.of(Map.of("id1", 1, "name1", "Jon"))));
+                "poly_object_array", List.of(Map.of("id1", 1, "name1", "Jon")))));
 
         var nested = extractNestedArrayTypes(manager.getSchema());
         assertThat(nested).isEqualTo(Map.of(
-                List.of(new ColumnName("poly_bigint_array_array")), new ArrayType(new ArrayType(new BigIntType())),
-                List.of(new ColumnName("poly_object_array_array")), new ArrayType(new ArrayType(new ObjectType()))
+                List.of(new ColumnName("doc"), new ColumnName("poly_bigint_array_array")), new ArrayType(new ArrayType(new BigIntType())),
+                List.of(new ColumnName("doc"), new ColumnName("poly_object_array_array")), new ArrayType(new ArrayType(new ObjectType()))
         ));
     }
 
@@ -359,55 +359,55 @@ class ColumnTypeTest {
                         .setIsPrimaryKey(false)
                         .setCharacterMaximumLength(0)
                         .build()
-        // new InformationSchemaColumnInfo.Builder()
-        // .setDataType("double precision")
-        // .setColumnName("doc['>']")
-        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of(">")))
-        // .setIsPrimaryKey(false)
-        // .setCharacterMaximumLength(0)
-        // .build(),
-        // new InformationSchemaColumnInfo.Builder()
-        // .setDataType("text_array")
-        // .setColumnName("doc['character_text_array']")
-        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("character_text_array")))
-        // .setIsPrimaryKey(false)
-        // .setCharacterMaximumLength(0)
-        // .build(),
-        // new InformationSchemaColumnInfo.Builder()
-        // .setDataType("boolean")
-        // .setColumnName("doc['double precision']")
-        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("double precision")))
-        // .setIsPrimaryKey(false)
-        // .setCharacterMaximumLength(0)
-        // .build(),
-        // new InformationSchemaColumnInfo.Builder()
-        // .setDataType("double precision")
-        // .setColumnName("doc['-']")
-        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("-")))
-        // .setIsPrimaryKey(false)
-        // .setCharacterMaximumLength(0)
-        // .build(),
-        // new InformationSchemaColumnInfo.Builder()
-        // .setDataType("text")
-        // .setColumnName("doc['character_text']")
-        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("character_text")))
-        // .setIsPrimaryKey(false)
-        // .setCharacterMaximumLength(0)
-        // .build(),
-        // new InformationSchemaColumnInfo.Builder()
-        // .setDataType("bigint")
-        // .setColumnName("doc['name_@']")
-        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("name_@")))
-        // .setIsPrimaryKey(false)
-        // .setCharacterMaximumLength(0)
-        // .build(),
-        // new InformationSchemaColumnInfo.Builder()
-        // .setDataType("double precision")
-        // .setColumnName("doc['']")
-        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("")))
-        // .setIsPrimaryKey(false)
-        // .setCharacterMaximumLength(0)
-        // .build()
+                // new InformationSchemaColumnInfo.Builder()
+                // .setDataType("double precision")
+                // .setColumnName("doc['>']")
+                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of(">")))
+                // .setIsPrimaryKey(false)
+                // .setCharacterMaximumLength(0)
+                // .build(),
+                // new InformationSchemaColumnInfo.Builder()
+                // .setDataType("text_array")
+                // .setColumnName("doc['character_text_array']")
+                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("character_text_array")))
+                // .setIsPrimaryKey(false)
+                // .setCharacterMaximumLength(0)
+                // .build(),
+                // new InformationSchemaColumnInfo.Builder()
+                // .setDataType("boolean")
+                // .setColumnName("doc['double precision']")
+                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("double precision")))
+                // .setIsPrimaryKey(false)
+                // .setCharacterMaximumLength(0)
+                // .build(),
+                // new InformationSchemaColumnInfo.Builder()
+                // .setDataType("double precision")
+                // .setColumnName("doc['-']")
+                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("-")))
+                // .setIsPrimaryKey(false)
+                // .setCharacterMaximumLength(0)
+                // .build(),
+                // new InformationSchemaColumnInfo.Builder()
+                // .setDataType("text")
+                // .setColumnName("doc['character_text']")
+                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("character_text")))
+                // .setIsPrimaryKey(false)
+                // .setCharacterMaximumLength(0)
+                // .build(),
+                // new InformationSchemaColumnInfo.Builder()
+                // .setDataType("bigint")
+                // .setColumnName("doc['name_@']")
+                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("name_@")))
+                // .setIsPrimaryKey(false)
+                // .setCharacterMaximumLength(0)
+                // .build(),
+                // new InformationSchemaColumnInfo.Builder()
+                // .setDataType("double precision")
+                // .setColumnName("doc['']")
+                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("")))
+                // .setIsPrimaryKey(false)
+                // .setCharacterMaximumLength(0)
+                // .build()
 
         );
 
