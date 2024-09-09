@@ -5,6 +5,7 @@
  */
 package io.debezium.server.cratedb;
 
+import static io.debezium.server.cratedb.ColumnTypeManager.extractNestedArrayTypes;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 import java.util.List;
@@ -143,6 +144,11 @@ class ColumnTypeTest {
                 "poly_object_array_array", List.of(Map.of("id2", 1, "name2", "Jon")),
                 "poly_object_array", List.of(Map.of("id1", 1, "name1", "Jon"))));
 
+        var nested = extractNestedArrayTypes(manager.getSchema());
+        assertThat(nested).isEqualTo(Map.of(
+                List.of(new ColumnName("poly_bigint_array_array")), new ArrayType(new ArrayType(new BigIntType())),
+                List.of(new ColumnName("poly_object_array_array")), new ArrayType(new ArrayType(new ObjectType()))
+        ));
     }
 
     @Test

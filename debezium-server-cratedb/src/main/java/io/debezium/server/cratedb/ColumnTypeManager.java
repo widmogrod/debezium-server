@@ -11,10 +11,7 @@ import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,9 +22,40 @@ public class ColumnTypeManager {
     private static final String NUMBER_REGEX = "[+-]?(\\d+([.]\\d*)?(e[+-]?\\d+)?|[.]\\d+(e[+-]?\\d+)?)";
     private static final String WHITESPACES_REGEX = "\\s*";
     private static final String POINT_REGEX = "POINT";
-    private static final Pattern pointPattern = Pattern.compile(POINT_REGEX + WHITESPACES_REGEX + "\\(" + NUMBER_REGEX + WHITESPACES_REGEX + NUMBER_REGEX + "\\)");
+//    private static final Pattern pointPattern = Pattern.compile(POINT_REGEX + WHITESPACES_REGEX + "\\(" + NUMBER_REGEX + WHITESPACES_REGEX + NUMBER_REGEX + "\\)");
 
     private final ObjectType schema = new ObjectType();
+
+    public static Map<List<ColumnName>, ArrayType> extractNestedArrayTypes(ObjectType schema) {
+        return extractNestedArrayTypes(new ArrayList<>(), schema);
+    }
+
+    public static Map<List<ColumnName>, ArrayType> extractNestedArrayTypes(List<ColumnName> path, ColumnType schema) {
+        return switch (schema) {
+            case ObjectType ot -> {
+                Map<List<ColumnName>, ArrayType> result = new HashMap<>();
+                for (var entry : ot.entrySet()) {
+                    for (var type : entry.getValue().entrySet()) {
+                        var newPath = new ArrayList<>(path);
+                        newPath.add(type.getValue().columnName());
+
+                        var nested = extractNestedArrayTypes(newPath, type.getKey());
+                        result.putAll(nested);
+                    }
+                }
+                yield result;
+            }
+            case ArrayType at -> switch (at.elementType()) {
+                case ArrayType at2 -> {
+                    var nested = extractNestedArrayTypes(path, at2);
+                    nested.putAll(Map.of(path, at));
+                    yield nested;
+                }
+                default -> new HashMap<>();
+            };
+            default -> new HashMap<>();
+        };
+    }
 
     public void fromInformationSchema(List<InformationSchemaColumnInfo> columns) {
         for (InformationSchemaColumnInfo column : columns) {
@@ -518,5 +546,9 @@ public class ColumnTypeManager {
 
     public void print() {
         System.out.println(typeShape(schema));
+    }
+
+    public ObjectType getSchema() {
+        return schema;
     }
 }
