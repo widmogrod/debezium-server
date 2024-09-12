@@ -3,12 +3,12 @@
  *
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package io.debezium.server.cratedb;
+package io.debezium.server.cratedb.types;
 
-public record BitType(Integer size) implements ColumnType {
+public record TextType() implements ColumnType {
     @Override
     public String shortName() {
-        return "bit"+size;
+        return "text";
     }
 
     @Override

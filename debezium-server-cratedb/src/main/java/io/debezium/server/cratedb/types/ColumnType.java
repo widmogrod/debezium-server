@@ -3,7 +3,7 @@
  *
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package io.debezium.server.cratedb;
+package io.debezium.server.cratedb.types;
 
 public sealed interface ColumnType permits ArrayType, BigIntType, BitType, BooleanType, CharType, FloatType, GeoShapeType, ObjectType, TextType, TimezType {
 

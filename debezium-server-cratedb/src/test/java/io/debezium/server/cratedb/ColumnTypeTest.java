@@ -5,18 +5,25 @@
  */
 package io.debezium.server.cratedb;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.commons.lang3.tuple.Pair;
-import org.junit.jupiter.api.Test;
+import static io.debezium.server.cratedb.ColumnTypeManager.extractNestedArrayTypes;
+import static io.debezium.server.cratedb.ColumnTypeManager.printAlterTable;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static io.debezium.server.cratedb.ColumnTypeManager.extractNestedArrayTypes;
-import static io.debezium.server.cratedb.ColumnTypeManager.printAlterTable;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import org.apache.commons.lang3.tuple.Pair;
+import org.junit.jupiter.api.Test;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.debezium.server.cratedb.types.ArrayType;
+import io.debezium.server.cratedb.types.BigIntType;
+import io.debezium.server.cratedb.types.ColumnType;
+import io.debezium.server.cratedb.types.ObjectType;
+import io.debezium.server.cratedb.types.TextType;
 
 class ColumnTypeTest {
     @Test
@@ -148,14 +155,12 @@ class ColumnTypeTest {
         var nested = extractNestedArrayTypes(manager.getSchema());
         assertThat(nested).isEqualTo(Map.of(
                 List.of(new ColumnName("doc"), new ColumnName("poly_bigint_array_array")), new ArrayType(new ArrayType(new BigIntType())),
-                List.of(new ColumnName("doc"), new ColumnName("poly_object_array_array")), new ArrayType(new ArrayType(new ObjectType()))
-        ));
+                List.of(new ColumnName("doc"), new ColumnName("poly_object_array_array")), new ArrayType(new ArrayType(new ObjectType()))));
 
         var alters = printAlterTable("test", nested);
         assertThat(alters).isEqualTo(List.of(
                 "ALTER TABLE test ADD COLUMN doc['poly_object_array_array'] ARRAY(ARRAY(OBJECT))",
-                "ALTER TABLE test ADD COLUMN doc['poly_bigint_array_array'] ARRAY(ARRAY(BIGINT))"
-        ));
+                "ALTER TABLE test ADD COLUMN doc['poly_bigint_array_array'] ARRAY(ARRAY(BIGINT))"));
     }
 
     @Test
@@ -386,55 +391,55 @@ class ColumnTypeTest {
                         .setIsPrimaryKey(false)
                         .setCharacterMaximumLength(0)
                         .build()
-                // new InformationSchemaColumnInfo.Builder()
-                // .setDataType("double precision")
-                // .setColumnName("doc['>']")
-                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of(">")))
-                // .setIsPrimaryKey(false)
-                // .setCharacterMaximumLength(0)
-                // .build(),
-                // new InformationSchemaColumnInfo.Builder()
-                // .setDataType("text_array")
-                // .setColumnName("doc['character_text_array']")
-                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("character_text_array")))
-                // .setIsPrimaryKey(false)
-                // .setCharacterMaximumLength(0)
-                // .build(),
-                // new InformationSchemaColumnInfo.Builder()
-                // .setDataType("boolean")
-                // .setColumnName("doc['double precision']")
-                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("double precision")))
-                // .setIsPrimaryKey(false)
-                // .setCharacterMaximumLength(0)
-                // .build(),
-                // new InformationSchemaColumnInfo.Builder()
-                // .setDataType("double precision")
-                // .setColumnName("doc['-']")
-                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("-")))
-                // .setIsPrimaryKey(false)
-                // .setCharacterMaximumLength(0)
-                // .build(),
-                // new InformationSchemaColumnInfo.Builder()
-                // .setDataType("text")
-                // .setColumnName("doc['character_text']")
-                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("character_text")))
-                // .setIsPrimaryKey(false)
-                // .setCharacterMaximumLength(0)
-                // .build(),
-                // new InformationSchemaColumnInfo.Builder()
-                // .setDataType("bigint")
-                // .setColumnName("doc['name_@']")
-                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("name_@")))
-                // .setIsPrimaryKey(false)
-                // .setCharacterMaximumLength(0)
-                // .build(),
-                // new InformationSchemaColumnInfo.Builder()
-                // .setDataType("double precision")
-                // .setColumnName("doc['']")
-                // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("")))
-                // .setIsPrimaryKey(false)
-                // .setCharacterMaximumLength(0)
-                // .build()
+        // new InformationSchemaColumnInfo.Builder()
+        // .setDataType("double precision")
+        // .setColumnName("doc['>']")
+        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of(">")))
+        // .setIsPrimaryKey(false)
+        // .setCharacterMaximumLength(0)
+        // .build(),
+        // new InformationSchemaColumnInfo.Builder()
+        // .setDataType("text_array")
+        // .setColumnName("doc['character_text_array']")
+        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("character_text_array")))
+        // .setIsPrimaryKey(false)
+        // .setCharacterMaximumLength(0)
+        // .build(),
+        // new InformationSchemaColumnInfo.Builder()
+        // .setDataType("boolean")
+        // .setColumnName("doc['double precision']")
+        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("double precision")))
+        // .setIsPrimaryKey(false)
+        // .setCharacterMaximumLength(0)
+        // .build(),
+        // new InformationSchemaColumnInfo.Builder()
+        // .setDataType("double precision")
+        // .setColumnName("doc['-']")
+        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("-")))
+        // .setIsPrimaryKey(false)
+        // .setCharacterMaximumLength(0)
+        // .build(),
+        // new InformationSchemaColumnInfo.Builder()
+        // .setDataType("text")
+        // .setColumnName("doc['character_text']")
+        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("character_text")))
+        // .setIsPrimaryKey(false)
+        // .setCharacterMaximumLength(0)
+        // .build(),
+        // new InformationSchemaColumnInfo.Builder()
+        // .setDataType("bigint")
+        // .setColumnName("doc['name_@']")
+        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("name_@")))
+        // .setIsPrimaryKey(false)
+        // .setCharacterMaximumLength(0)
+        // .build(),
+        // new InformationSchemaColumnInfo.Builder()
+        // .setDataType("double precision")
+        // .setColumnName("doc['']")
+        // .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("")))
+        // .setIsPrimaryKey(false)
+        // .setCharacterMaximumLength(0)
+        // .build()
 
         );
 

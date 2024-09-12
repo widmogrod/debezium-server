@@ -3,39 +3,39 @@
  *
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package io.debezium.server.cratedb;
+package io.debezium.server.cratedb.types;
 
 import java.util.HashMap;
 import java.util.Optional;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-final public class ObjectType extends HashMap<ColumnName, TypeCollision> implements ColumnType {
+final public class ObjectType extends HashMap<io.debezium.server.cratedb.ColumnName, io.debezium.server.cratedb.TypeCollision> implements ColumnType {
     public ObjectType() {
         super();
     }
 
-    public static ObjectType of(ColumnName name, ColumnType type) {
+    public static ObjectType of(io.debezium.server.cratedb.ColumnName name, ColumnType type) {
         var result = new ObjectType();
         result.putColumnNameWithType(name, type);
         return result;
     }
 
     @Deprecated
-    public ColumnInfo putColumnNameWithType(ColumnName columnName, ColumnType columnType) {
+    public io.debezium.server.cratedb.ColumnInfo putColumnNameWithType(io.debezium.server.cratedb.ColumnName columnName, ColumnType columnType) {
         return this
-                .computeIfAbsent(columnName, k -> new TypeCollision())
-                .putType(columnType, new ColumnInfo(false, columnName));
+                .computeIfAbsent(columnName, k -> new io.debezium.server.cratedb.TypeCollision())
+                .putType(columnType, new io.debezium.server.cratedb.ColumnInfo(false, columnName));
     }
 
-    public Pair<ColumnType, ColumnInfo> putColumnNameWithType2(ColumnName columnName, ColumnType columnType) {
+    public Pair<ColumnType, io.debezium.server.cratedb.ColumnInfo> putColumnNameWithType2(io.debezium.server.cratedb.ColumnName columnName, ColumnType columnType) {
         return this
-                .computeIfAbsent(columnName, k -> new TypeCollision())
-                .putType2(columnType, new ColumnInfo(false, columnName));
+                .computeIfAbsent(columnName, k -> new io.debezium.server.cratedb.TypeCollision())
+                .putType2(columnType, new io.debezium.server.cratedb.ColumnInfo(false, columnName));
     }
 
     @Deprecated
-    public Optional<Pair<ObjectType, ColumnInfo>> tryGetColumnInfoOfObjectType(ColumnName columnName) {
+    public Optional<Pair<ObjectType, io.debezium.server.cratedb.ColumnInfo>> tryGetColumnInfoOfObjectType(io.debezium.server.cratedb.ColumnName columnName) {
         if (containsKey(columnName)) {
             return get(columnName).tryGetColumInfoOfObjectType();
         }
@@ -43,7 +43,7 @@ final public class ObjectType extends HashMap<ColumnName, TypeCollision> impleme
         return Optional.empty();
     }
 
-    public Optional<Pair<ColumnType, ColumnInfo>> tryGetColumnInfoOf(ColumnName columnName, ColumnType columnType) {
+    public Optional<Pair<ColumnType, io.debezium.server.cratedb.ColumnInfo>> tryGetColumnInfoOf(io.debezium.server.cratedb.ColumnName columnName, ColumnType columnType) {
         if (containsKey(columnName)) {
             return get(columnName).tryGetColumInfoOf(columnType);
         }
@@ -51,7 +51,7 @@ final public class ObjectType extends HashMap<ColumnName, TypeCollision> impleme
         return Optional.empty();
     }
 
-    public Optional<Pair<ColumnType, ColumnInfo>> tryGetColumnNamed(ColumnName columnName) {
+    public Optional<Pair<ColumnType, io.debezium.server.cratedb.ColumnInfo>> tryGetColumnNamed(io.debezium.server.cratedb.ColumnName columnName) {
         for (var entry : entrySet()) {
             var key = entry.getKey();
             var value = entry.getValue();

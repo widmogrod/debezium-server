@@ -8,6 +8,8 @@ package io.debezium.server.cratedb;
 import java.util.List;
 import java.util.Objects;
 
+import io.debezium.server.cratedb.types.ColumnType;
+
 public record ColumnName(String columnName) {
     public ColumnName {
         Objects.requireNonNull(columnName);

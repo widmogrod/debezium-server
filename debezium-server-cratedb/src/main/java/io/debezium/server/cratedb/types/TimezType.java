@@ -3,12 +3,12 @@
  *
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package io.debezium.server.cratedb;
+package io.debezium.server.cratedb.types;
 
-public record BooleanType() implements ColumnType {
+public record TimezType() implements ColumnType {
     @Override
     public String shortName() {
-        return "boolean";
+        return "timetz";
     }
 
     @Override

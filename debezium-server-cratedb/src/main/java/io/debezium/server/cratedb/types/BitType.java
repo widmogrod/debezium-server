@@ -3,12 +3,12 @@
  *
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package io.debezium.server.cratedb;
+package io.debezium.server.cratedb.types;
 
-public record TimezType() implements ColumnType {
+public record BitType(Integer size) implements ColumnType {
     @Override
     public String shortName() {
-        return "timetz";
+        return "bit"+size;
     }
 
     @Override

@@ -5,9 +5,6 @@
  */
 package io.debezium.server.cratedb;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.debezium.util.Strings;
-
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -16,13 +13,27 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.debezium.server.cratedb.types.ArrayType;
+import io.debezium.server.cratedb.types.BigIntType;
+import io.debezium.server.cratedb.types.BitType;
+import io.debezium.server.cratedb.types.BooleanType;
+import io.debezium.server.cratedb.types.CharType;
+import io.debezium.server.cratedb.types.ColumnType;
+import io.debezium.server.cratedb.types.FloatType;
+import io.debezium.server.cratedb.types.GeoShapeType;
+import io.debezium.server.cratedb.types.ObjectType;
+import io.debezium.server.cratedb.types.TextType;
+import io.debezium.server.cratedb.types.TimezType;
+
 public class ColumnTypeManager {
     private static final DateTimeFormatter dateTimeFormatter = new DateTimeFormatterBuilder()
             .append(DateTimeFormatter.ofPattern("[MM/dd/yyyy]" + "[dd-MM-yyyy]" + "[yyyy-MM-dd]")).append(DateTimeFormatter.ofPattern("[HH:mm:ss]")).toFormatter();
     private static final String NUMBER_REGEX = "[+-]?(\\d+([.]\\d*)?(e[+-]?\\d+)?|[.]\\d+(e[+-]?\\d+)?)";
     private static final String WHITESPACES_REGEX = "\\s*";
     private static final String POINT_REGEX = "POINT";
-//    private static final Pattern pointPattern = Pattern.compile(POINT_REGEX + WHITESPACES_REGEX + "\\(" + NUMBER_REGEX + WHITESPACES_REGEX + NUMBER_REGEX + "\\)");
+    // private static final Pattern pointPattern = Pattern.compile(POINT_REGEX + WHITESPACES_REGEX + "\\(" + NUMBER_REGEX + WHITESPACES_REGEX + NUMBER_REGEX + "\\)");
 
     private final ObjectType schema = new ObjectType();
 
@@ -78,8 +89,9 @@ public class ColumnTypeManager {
             // format to pattern col1['col2']['col3']
             // skip first element
             return path.subList(1, path.size()).stream().map(ColumnName::columnName).reduce(path.get(0).columnName(), (a, b) -> a + "['" + b + "']");
-        } else {
-            return  path.get(0).columnName();
+        }
+        else {
+            return path.get(0).columnName();
         }
     }
 
@@ -165,13 +177,15 @@ public class ColumnTypeManager {
                     if (!isLast) {
                         if (currentColumnType instanceof ObjectType ot) {
                             parentType = ot;
-                        } else {
+                        }
+                        else {
                             parentType = new ObjectType();
                         }
                     }
                 }
                 schema.putColumnNameWithType2(columnName, rootType);
-            } else {
+            }
+            else {
                 schema.putColumnNameWithType2(columnName, columnType);
             }
         }
@@ -351,7 +365,8 @@ public class ColumnTypeManager {
                         k = new ArrayType(k);
                         if (result.containsKey(k)) {
                             result.get(k).addAll(v);
-                        } else {
+                        }
+                        else {
                             result.put(k, v);
                         }
                     });
@@ -363,7 +378,8 @@ public class ColumnTypeManager {
             columnType = new ArrayType(columnType);
             if (result.containsKey(columnType)) {
                 result.get(columnType).add(o);
-            } else {
+            }
+            else {
                 List<Object> newList = new ArrayList<>();
                 newList.add(o);
                 result.put(columnType, newList);

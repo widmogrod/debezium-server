@@ -10,6 +10,9 @@ import java.util.Optional;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import io.debezium.server.cratedb.types.ColumnType;
+import io.debezium.server.cratedb.types.ObjectType;
+
 public class TypeCollision extends HashMap<ColumnType, ColumnInfo> {
     public TypeCollision() {
         super();

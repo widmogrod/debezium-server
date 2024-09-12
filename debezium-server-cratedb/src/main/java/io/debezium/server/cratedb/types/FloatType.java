@@ -3,12 +3,12 @@
  *
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package io.debezium.server.cratedb;
+package io.debezium.server.cratedb.types;
 
-public record GeoShapeType() implements ColumnType {
+public record FloatType() implements ColumnType {
     @Override
     public String shortName() {
-        return "geo_shape";
+        return "real";
     }
 
     @Override
