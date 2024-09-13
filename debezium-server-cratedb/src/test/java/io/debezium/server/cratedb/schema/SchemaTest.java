@@ -9,6 +9,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 
@@ -17,20 +18,37 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 class SchemaTest {
 
     @Test
-    void testMethod() {
+    void testFirstTransformation() {
         var schema = Schema.of();
-        var object = Map.of("name", "hello");
+        var object01 = Map.of("name", "hello");
 
-        var result = fromObject(schema, object);
+        var result = fromObject(schema, object01);
         var schema1 = result.getLeft();
         var object1 = result.getRight();
 
         // first object should not be transformed
-        assertThat(object1).isEqualTo(object);
+        assertThat(object1).isEqualTo(
+                Map.of("name", "hello")
+        );
         // schema must be immutable
         assertThat(schema).isEqualTo(Schema.Dict.of());
         // new schema must reflect input object structure
         assertThat(schema1).isEqualTo(
+                Schema.Dict.of("name", Schema.Collision.ofTextNamed("name"))
+        );
+
+        var object02 = Map.of("name", false);
+        var result2 = fromObject(schema1, object02);
+        var schema2 = result2.getLeft();
+        var object3 = result2.getRight();
+
+        // object should be converted
+        assertThat(object3).isEqualTo(Map.of("name", "false"));
+        // schema must be immutable
+        assertThat(schema1).isEqualTo(
+                Schema.Dict.of("name", Schema.Collision.ofTextNamed("name"))
+        );
+        assertThat(schema2).isEqualTo(
                 Schema.Dict.of("name", Schema.Collision.ofTextNamed("name"))
         );
     }
@@ -45,24 +63,31 @@ class SchemaTest {
                 var schema1 = (Schema.Dict) schema;
 
                 var object2 = new HashMap<>();
+                // immutability wrap:
                 Map<Object, Schema.Collision> fields = new HashMap<>(schema1.fields());
 
                 for (var fieldName : x.keySet()) {
                     var fieldValue = x.get(fieldName);
                     // find if fieldName exists in schema fields
                     if (fields.containsKey(fieldName)) {
+                        boolean foundAndConverted = false;
                         // get types that this field has
-                        var collision = fields.get(fieldName);
-                        for (var collisionInfo : collision.set()) {
+                        var collision = new HashSet<>(fields.get(fieldName).set());
+                        for (var collisionInfo : collision) {
                             var knownType = collisionInfo.type();
                             // and try to match fieldValue against known types
-                            var result = matchType(knownType, fieldValue);
+                            var result = tryConvertToType(knownType, fieldValue);
                             // when there is new value save it in field name associated with given type
                             if (result.isPresent()) {
                                 // and field and value to return object
                                 object2.put(collisionInfo.fieldName(), result.get());
+                                foundAndConverted = true;
                                 break;
                             }
+                        }
+
+                        if (foundAndConverted) {
+                            continue;
                         }
 
                         // when field cannot be converted to known types
@@ -74,7 +99,8 @@ class SchemaTest {
                         // TODO add also detecting if field name needs to be - type-suffix
                         // current implementation assume that orginal field name is used
                         var collisionInfo = Schema.Collision.Info.of(fieldName, detectedType);
-                        collision.set().add(collisionInfo);
+                        collision.add(collisionInfo);
+                        fields.put(fieldName, Schema.Collision.of(collision));
 
                         // and field and value to return object
                         // under normalized field name
@@ -104,16 +130,23 @@ class SchemaTest {
         };
     }
 
-    private Optional<Object> matchType(Schema.I knownType, Object fieldValue) {
+    private Optional<Object> tryConvertToType(Schema.I knownType, Object fieldValue) {
         return switch (knownType) {
-            case Schema.Primitive.TEXT -> Optional.of(fieldValue.toString());
-            default -> Optional.empty();
+            case Schema.Primitive.TEXT -> switch (fieldValue) {
+                case String ignored -> Optional.of(fieldValue);
+                case Integer ignored -> Optional.of(fieldValue.toString());
+                case Boolean ignored -> Optional.of(fieldValue.toString());
+                default -> Optional.empty();
+            };
+
+            default -> throw new IllegalArgumentException("Unknown type: " + knownType);
         };
     }
 
     private Schema.I detectType(Object fieldValue) {
         return switch (fieldValue) {
-            case String x -> Schema.Primitive.TEXT;
+            case String ignored -> Schema.Primitive.TEXT;
+            case Boolean ignored -> Schema.Primitive.BOOLEAN;
             default -> throw new IllegalArgumentException("Unknown type: " + fieldValue.getClass());
         };
     }
