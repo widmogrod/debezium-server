@@ -20,7 +20,7 @@ class SchemaTest {
     @Test
     void testFirstTransformation() {
         var schema = Schema.of();
-        var object01 = Map.of("name", "hello");
+        var object01 = Map.of("name", "hello", "age", 1);
 
         var result = fromObject(schema, object01);
         var schema1 = result.getLeft();
@@ -28,28 +28,37 @@ class SchemaTest {
 
         // first object should not be transformed
         assertThat(object1).isEqualTo(
-                Map.of("name", "hello")
+                Map.of("name", "hello", "age", 1)
         );
         // schema must be immutable
         assertThat(schema).isEqualTo(Schema.Dict.of());
         // new schema must reflect input object structure
         assertThat(schema1).isEqualTo(
-                Schema.Dict.of("name", Schema.Collision.ofTextNamed("name"))
+                Schema.Dict.of(
+                        "name", Schema.Collision.of(Schema.Collision.Info.textNamed("name")),
+                        "age", Schema.Collision.of(Schema.Collision.Info.intNamed("age"))
+                )
         );
 
-        var object02 = Map.of("name", false);
+        var object02 = Map.of("name", false, "age", 1);
         var result2 = fromObject(schema1, object02);
         var schema2 = result2.getLeft();
         var object3 = result2.getRight();
 
         // object should be converted
-        assertThat(object3).isEqualTo(Map.of("name", "false"));
+        assertThat(object3).isEqualTo(Map.of("name", "false", "age", 1));
         // schema must be immutable
         assertThat(schema1).isEqualTo(
-                Schema.Dict.of("name", Schema.Collision.ofTextNamed("name"))
+                Schema.Dict.of(
+                        "name", Schema.Collision.of(Schema.Collision.Info.textNamed("name")),
+                        "age", Schema.Collision.of(Schema.Collision.Info.intNamed("age"))
+                )
         );
         assertThat(schema2).isEqualTo(
-                Schema.Dict.of("name", Schema.Collision.ofTextNamed("name"))
+                Schema.Dict.of(
+                        "name", Schema.Collision.of(Schema.Collision.Info.textNamed("name")),
+                        "age", Schema.Collision.of(Schema.Collision.Info.intNamed("age"))
+                )
         );
     }
 
@@ -134,8 +143,20 @@ class SchemaTest {
         return switch (knownType) {
             case Schema.Primitive.TEXT -> switch (fieldValue) {
                 case String ignored -> Optional.of(fieldValue);
-                case Integer ignored -> Optional.of(fieldValue.toString());
                 case Boolean ignored -> Optional.of(fieldValue.toString());
+                case Integer ignored -> Optional.of(fieldValue.toString());
+                case Long ignored -> Optional.of(fieldValue.toString());
+                case Float ignored -> Optional.of(fieldValue.toString());
+                case Double ignored -> Optional.of(fieldValue.toString());
+                default -> Optional.empty();
+            };
+
+            case Schema.Primitive.BIGINT -> switch (fieldValue) {
+                case Boolean ignored -> Optional.of((int) fieldValue);
+                case Integer ignored -> Optional.of(fieldValue);
+                case Long ignored -> Optional.of((int) fieldValue);
+                case Float ignored -> Optional.of((int) fieldValue);
+                case Double ignored -> Optional.of((int) fieldValue);
                 default -> Optional.empty();
             };
 
@@ -146,6 +167,7 @@ class SchemaTest {
     private Schema.I detectType(Object fieldValue) {
         return switch (fieldValue) {
             case String ignored -> Schema.Primitive.TEXT;
+            case Integer integer -> Schema.Primitive.BIGINT;
             case Boolean ignored -> Schema.Primitive.BOOLEAN;
             default -> throw new IllegalArgumentException("Unknown type: " + fieldValue.getClass());
         };
