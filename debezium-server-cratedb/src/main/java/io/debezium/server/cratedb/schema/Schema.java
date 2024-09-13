@@ -27,7 +27,9 @@ public record Schema() {
     }
 
     public record Array(I innerType) implements I {
-
+        public static Array of(I i) {
+            return new Array(i);
+        }
     }
 
     public record Bit(Number size) implements I {
