@@ -7,7 +7,7 @@ package io.debezium.server.cratedb.schema;
 
 
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -20,14 +20,13 @@ public record Schema() {
     }
 
     public enum Primitive implements I {
-        BIGINT,
-        BOOLEAN, TEXT
+        BIGINT, BOOLEAN, TEXT
     }
 
     public sealed interface I permits Primitive, Array, Bit, Dict {
     }
 
-    public record Array(I of) implements I {
+    public record Array(I innerType) implements I {
 
     }
 
@@ -63,7 +62,7 @@ public record Schema() {
         }
 
         public static Collision of(Info... types) {
-            return of(new HashSet<>(List.of(types)));
+            return of(new LinkedHashSet<>(List.of(types)));
         }
 
         public record Info(I type, Object fieldName) {

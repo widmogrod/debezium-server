@@ -9,7 +9,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
 
@@ -40,13 +40,13 @@ class SchemaTest {
                 )
         );
 
-        var object02 = Map.of("name", false, "age", 1);
+        var object02 = Map.of("name", false, "age", "not available");
         var result2 = fromObject(schema1, object02);
         var schema2 = result2.getLeft();
         var object3 = result2.getRight();
 
         // object should be converted
-        assertThat(object3).isEqualTo(Map.of("name", "false", "age", 1));
+        assertThat(object3).isEqualTo(Map.of("name", "false", "age_text", "not available"));
         // schema must be immutable
         assertThat(schema1).isEqualTo(
                 Schema.Dict.of(
@@ -57,7 +57,10 @@ class SchemaTest {
         assertThat(schema2).isEqualTo(
                 Schema.Dict.of(
                         "name", Schema.Collision.of(Schema.Collision.Info.textNamed("name")),
-                        "age", Schema.Collision.of(Schema.Collision.Info.intNamed("age"))
+                        "age", Schema.Collision.of(
+                                Schema.Collision.Info.intNamed("age"),
+                                Schema.Collision.Info.textNamed("age_text")
+                        )
                 )
         );
     }
@@ -81,7 +84,7 @@ class SchemaTest {
                     if (fields.containsKey(fieldName)) {
                         boolean foundAndConverted = false;
                         // get types that this field has
-                        var collision = new HashSet<>(fields.get(fieldName).set());
+                        var collision = new LinkedHashSet<>(fields.get(fieldName).set());
                         for (var collisionInfo : collision) {
                             var knownType = collisionInfo.type();
                             // and try to match fieldValue against known types
@@ -105,13 +108,18 @@ class SchemaTest {
                         // this also means that Schema should be part of union type
                         var detectedType = detectType(fieldValue);
 
-                        // TODO add also detecting if field name needs to be - type-suffix
-                        // current implementation assume that orginal field name is used
-                        var collisionInfo = Schema.Collision.Info.of(fieldName, detectedType);
+                        // introduce new collision type
+                        var newFieldName = fieldSuffix(fieldName, detectedType);
+                        // make sure that other field names are not named same
+                        newFieldName = uniqueField(newFieldName, collision);
+
+                        // create new collision information
+                        var collisionInfo = Schema.Collision.Info.of(newFieldName, detectedType);
+                        // and update schema with new information
                         collision.add(collisionInfo);
                         fields.put(fieldName, Schema.Collision.of(collision));
 
-                        // and field and value to return object
+                        // add field and value to return object
                         // under normalized field name
                         object2.put(collisionInfo.fieldName(), fieldValue);
                     }
@@ -136,6 +144,39 @@ class SchemaTest {
             }
 
             default -> Pair.of(schema, object);
+        };
+    }
+
+    private Object uniqueField(Object fieldName, LinkedHashSet<Schema.Collision.Info> collision) {
+        final Object[] newFieldName = {fieldName};
+        int counter = 1;
+
+        while (collision.stream().anyMatch(info -> info.fieldName().equals(newFieldName[0]))) {
+            newFieldName[0] = fieldName + "_" + counter;
+            counter++;
+
+            if (counter > 20) {
+                throw new IllegalArgumentException("Too many collisions in field naming.");
+            }
+        }
+
+        return newFieldName[0];
+    }
+
+    private Object fieldSuffix(Object fieldName, Schema.I type) {
+        return fieldName.toString() + "_" + suffixType(type);
+    }
+
+    private String suffixType(Schema.I type) {
+        return switch (type) {
+            case Schema.Array array -> suffixType(array.innerType()) + "_array";
+            case Schema.Bit bit -> "bit" + bit.size();
+            case Schema.Dict dict -> "object";
+            case Schema.Primitive primitive -> switch (primitive) {
+                case BIGINT -> "int";
+                case BOOLEAN -> "bool";
+                case TEXT -> "text";
+            };
         };
     }
 
