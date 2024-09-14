@@ -54,7 +54,7 @@ class SchemaTest {
                 "name", false,
                 "age", "not available",
                 "address", List.of(
-                        // Map.of("zip-code", List.of(false)),
+                        Map.of("zip-code", List.of(false)),
                         Map.of("country", "Poland")));
         var result2 = fromObject(schema1, object02);
         var schema2 = result2.getLeft();
@@ -66,7 +66,7 @@ class SchemaTest {
                         "name_bool", false,
                         "age_text", "not available",
                         "address", List.of(
-                                // Map.of("zip-code", List.of(false)),
+                                Map.of("zip-code_bool_array", List.of(false)),
                                 Map.of("country", "Poland"))));
         // schema must be immutable
         assertThat(schema1).isEqualTo(
@@ -80,7 +80,7 @@ class SchemaTest {
                         "name", Schema.Coli.of(Schema.Primitive.TEXT, Schema.Primitive.BOOLEAN),
                         "age", Schema.Coli.of(Schema.Primitive.BIGINT, Schema.Primitive.TEXT),
                         "address", Schema.Array.of(Schema.Dict.of(
-                                "zip-code", Schema.Primitive.TEXT,
+                                "zip-code", Schema.Coli.of(Schema.Primitive.TEXT, Schema.Array.of(Schema.Primitive.BOOLEAN)),
                                 "country", Schema.Primitive.TEXT))));
     }
 
@@ -104,24 +104,20 @@ class SchemaTest {
                     var result = new ArrayList<>();
                     var innerType = schemaList.innerType();
                     for (var item : list) {
-                        var detectedType = detectType(item);
-
-                        var resultPair = fromObject(detectedType, item);
+                        var resultPair = fromObject(innerType, item);
                         var resultSchema = resultPair.getLeft();
                         var resultObject = resultPair.getRight();
 
-                        var finalType = merge(innerType, resultSchema);
-
                         // build up understanding of schema
                         // object inside may have new fields that can be added
-                        innerType = finalType;
+                        innerType = merge(innerType, resultSchema);
 
                         result.add(resultObject);
                     }
 
                     yield Pair.of(Schema.Array.of(innerType), result);
                 }
-                default -> throw new IllegalArgumentException("Unknown schema type: " + schema);
+                default -> Pair.of(merge(schema, detectType(object)), object);
             };
 
             case Map x -> {
@@ -144,7 +140,7 @@ class SchemaTest {
                         // detect field type, and add collision type
                         var detectedType = detectType(fieldValue);
 
-                        var resultPair = fromObject(detectedType, fieldValue);
+                        var resultPair = fromObject(existingType, fieldValue);
                         var resultSchema = resultPair.getLeft();
                         var resultObject = resultPair.getRight();
 
@@ -166,14 +162,11 @@ class SchemaTest {
                         var resultSchema = resultPair.getLeft();
                         var resultObject = resultPair.getRight();
 
-                        var finalType = merge(resultSchema, detectedType);
-                        fields.put(fieldName, finalType);
-
-                        var finalFieldName = typeSuffix(fieldName, finalType, detectedType);
+                        fields.put(fieldName, resultSchema);
 
                         // and field and value to return object
                         // under normalized field name
-                        object2.put(finalFieldName, resultObject);
+                        object2.put(fieldName, resultObject);
                     }
                 }
 
@@ -266,6 +259,10 @@ class SchemaTest {
             default -> {
                 if (a == b) {
                     yield a;
+                }
+
+                if (b instanceof Schema.Coli coli) {
+                    yield merge(coli, a);
                 }
 
                 yield Schema.Coli.of(a, b);
