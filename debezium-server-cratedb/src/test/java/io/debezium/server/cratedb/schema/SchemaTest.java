@@ -28,8 +28,8 @@ class SchemaTest {
                 "age", 1,
                 "address", List.of(
                         Map.of("zip-code", "12-345")),
-                "list_of_list", List.of(List.of(false))
-//                "bag", List.of(1, false, "??", 2, true, "!")
+                "list_of_list", List.of(List.of(false)),
+                "bag", List.of(1, false, "??", 2, true, "!")
         );
 
         var result = fromObject(schema, object01);
@@ -43,10 +43,8 @@ class SchemaTest {
                         "age", 1,
                         "address", List.of(
                                 Map.of("zip-code", "12-345")),
-                        "list_of_list", List.of(List.of(false))
-//                        "bag_int_array", List.of(1, 2),
-//                        "bag_bool_array", List.of(false, true),
-//                        "bag_test_array", List.of("??", "!")
+                        "list_of_list", List.of(List.of(false)),
+                        "bag", List.of(1, false, "??", 2, true, "!")
                 )
         );
         // schema must be immutable
@@ -58,12 +56,12 @@ class SchemaTest {
                         "age", Schema.Primitive.BIGINT,
                         "address", Schema.Array.of(Schema.Dict.of(
                                 "zip-code", Schema.Primitive.TEXT)),
-                        "list_of_list", Schema.Array.of(Schema.Array.of(Schema.Primitive.BOOLEAN))
-//                        "bag", Schema.Array.of(Schema.Coli.of(
-//                                Schema.Primitive.BIGINT,
-//                                Schema.Primitive.BOOLEAN,
-//                                Schema.Primitive.TEXT
-//                        ))
+                        "list_of_list", Schema.Array.of(Schema.Array.of(Schema.Primitive.BOOLEAN)),
+                        "bag", Schema.Array.of(Schema.Coli.of(
+                                Schema.Primitive.BIGINT,
+                                Schema.Primitive.BOOLEAN,
+                                Schema.Primitive.TEXT
+                        ))
                 )
         );
 
@@ -85,11 +83,7 @@ class SchemaTest {
                         "address", List.of(
                                 Map.of("zip-code_bool_array", List.of(false)),
                                 Map.of("country", "Poland"))
-//                        "bag", Schema.Array.of(Schema.Coli.of(
-//                                Schema.Primitive.BIGINT,
-//                                Schema.Primitive.BOOLEAN,
-//                                Schema.Primitive.TEXT
-//                        ))
+
                 )
         );
         // schema must be immutable
@@ -99,7 +93,12 @@ class SchemaTest {
                         "age", Schema.Primitive.BIGINT,
                         "address", Schema.Array.of(Schema.Dict.of(
                                 "zip-code", Schema.Primitive.TEXT)),
-                        "list_of_list", Schema.Array.of(Schema.Array.of(Schema.Primitive.BOOLEAN))
+                        "list_of_list", Schema.Array.of(Schema.Array.of(Schema.Primitive.BOOLEAN)),
+                        "bag", Schema.Array.of(Schema.Coli.of(
+                                Schema.Primitive.BIGINT,
+                                Schema.Primitive.BOOLEAN,
+                                Schema.Primitive.TEXT
+                        ))
                 )
         );
         assertThat(schema2).isEqualTo(
@@ -109,7 +108,12 @@ class SchemaTest {
                         "address", Schema.Array.of(Schema.Dict.of(
                                 "zip-code", Schema.Coli.of(Schema.Primitive.TEXT, Schema.Array.of(Schema.Primitive.BOOLEAN)),
                                 "country", Schema.Primitive.TEXT)),
-                        "list_of_list", Schema.Array.of(Schema.Array.of(Schema.Primitive.BOOLEAN))
+                        "list_of_list", Schema.Array.of(Schema.Array.of(Schema.Primitive.BOOLEAN)),
+                        "bag", Schema.Array.of(Schema.Coli.of(
+                                Schema.Primitive.BIGINT,
+                                Schema.Primitive.BOOLEAN,
+                                Schema.Primitive.TEXT
+                        ))
                 )
         );
     }
