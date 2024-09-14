@@ -6,11 +6,7 @@
 package io.debezium.server.cratedb.schema;
 
 
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 
 public record Schema() {
@@ -23,7 +19,7 @@ public record Schema() {
         BIGINT, BOOLEAN, TEXT
     }
 
-    public sealed interface I permits Primitive, Array, Bit, Dict {
+    public sealed interface I permits Array, Bit, Coli, Dict, Primitive {
     }
 
     public record Array(I innerType) implements I {
@@ -36,49 +32,35 @@ public record Schema() {
 
     }
 
-    public record Dict(Map<Object, Collision> fields) implements I {
+    public record Dict(Map<Object, I> fields) implements I {
         public static Dict of() {
-            return of(new HashMap<>());
+            return of(new LinkedHashMap<>());
         }
 
-        public static Dict of(Map<Object, Collision> fields) {
+        public static Dict of(Map<Object, I> fields) {
             return new Dict(fields);
         }
 
         public static Dict of(Object... keyValues) {
-            var fields = new HashMap<Object, Collision>();
+            var fields = new LinkedHashMap<Object, I>();
             for (int i = 0; i < keyValues.length; i += 2) {
-                fields.put(keyValues[i], (Collision) keyValues[i + 1]);
+                fields.put(keyValues[i], (I) keyValues[i + 1]);
             }
             return of(fields);
         }
     }
 
-    public record Collision(Set<Info> set) {
-        public static Collision ofTextNamed(String fieldName) {
-            return of(Info.textNamed(fieldName));
+    public record Coli(Set<I> set) implements I {
+        public static Coli of(Set<I> set) {
+            return new Coli(set);
         }
 
-        public static Collision of(Set<Info> set) {
-            return new Collision(set);
-        }
-
-        public static Collision of(Info... types) {
-            return of(new LinkedHashSet<>(List.of(types)));
-        }
-
-        public record Info(I type, Object fieldName) {
-            public static Info of(Object fieldName, I type) {
-                return new Info(type, fieldName);
-            }
-
-            public static Info textNamed(Object fieldName) {
-                return of(fieldName, Primitive.TEXT);
-            }
-
-            public static Info intNamed(Object fieldName) {
-                return of(fieldName, Primitive.BIGINT);
-            }
+        public static Coli of(I a, I b) {
+            var set  = new LinkedHashSet<I>();
+            // FIXME: a or b can be Coli, flatMap them
+            set.add(a);
+            set.add(b);
+            return of(set);
         }
     }
 }
