@@ -27,7 +27,9 @@ class SchemaTest {
                 "name", "hello",
                 "age", 1,
                 "address", List.of(
-                        Map.of("zip-code", "12-345")));
+                        Map.of("zip-code", "12-345"))
+//                "bag", List.of(1, false, "??", 2, true, "!")
+        );
 
         var result = fromObject(schema, object01);
         var schema1 = result.getLeft();
@@ -39,7 +41,12 @@ class SchemaTest {
                         "name", "hello",
                         "age", 1,
                         "address", List.of(
-                                Map.of("zip-code", "12-345"))));
+                                Map.of("zip-code", "12-345"))
+//                        "bag_int_array", List.of(1, 2),
+//                        "bag_bool_array", List.of(false, true),
+//                        "bag_test_array", List.of("??", "!")
+                )
+        );
         // schema must be immutable
         assertThat(schema).isEqualTo(Schema.Dict.of());
         // new schema must reflect input object structure
@@ -48,7 +55,14 @@ class SchemaTest {
                         "name", Schema.Primitive.TEXT,
                         "age", Schema.Primitive.BIGINT,
                         "address", Schema.Array.of(Schema.Dict.of(
-                                "zip-code", Schema.Primitive.TEXT))));
+                                "zip-code", Schema.Primitive.TEXT))
+//                        "bag", Schema.Array.of(Schema.Coli.of(
+//                                Schema.Primitive.BIGINT,
+//                                Schema.Primitive.BOOLEAN,
+//                                Schema.Primitive.TEXT
+//                        ))
+                )
+        );
 
         var object02 = Map.of(
                 "name", false,
@@ -67,7 +81,14 @@ class SchemaTest {
                         "age_text", "not available",
                         "address", List.of(
                                 Map.of("zip-code_bool_array", List.of(false)),
-                                Map.of("country", "Poland"))));
+                                Map.of("country", "Poland"))
+//                        "bag", Schema.Array.of(Schema.Coli.of(
+//                                Schema.Primitive.BIGINT,
+//                                Schema.Primitive.BOOLEAN,
+//                                Schema.Primitive.TEXT
+//                        ))
+                )
+        );
         // schema must be immutable
         assertThat(schema1).isEqualTo(
                 Schema.Dict.of(
@@ -239,21 +260,8 @@ class SchemaTest {
             };
 
             case Schema.Coli(Set<Schema.I> setA) -> switch (b) {
-                case Schema.Coli(Set<Schema.I> setB) -> {
-                    var set = new LinkedHashSet<>(setA);
-                    for (var i : setB) {
-                        // FIXME flatmap
-                        set.add(i);
-                    }
-
-                    yield Schema.Coli.of(set);
-                }
-
-                default -> {
-                    var set = new LinkedHashSet<>(setA);
-                    set.add(b);
-                    yield Schema.Coli.of(set);
-                }
+                case Schema.Coli(Set<Schema.I> setB) -> Schema.Coli.of(setA, setB);
+                default -> Schema.Coli.of(setA, b);
             };
 
             default -> {
