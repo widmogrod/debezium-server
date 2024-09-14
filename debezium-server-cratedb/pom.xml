@@ -13,6 +13,7 @@
 
     <properties>
         <skipITs>true</skipITs>
+        <java.version>21</java.version>
     </properties>
 
     <dependencies>
@@ -131,8 +132,11 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.5.0</version>
                 <configuration>
-                    <excludes>**/ColumnTypeManager.java</excludes>
+                    <excludes>
+                        **/ColumnTypeManager.java, **/SchemaTest.java
+                    </excludes>
                 </configuration>
             </plugin>
             <plugin>

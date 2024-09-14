@@ -5,8 +5,7 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,7 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import org.apache.commons.lang3.tuple.Pair;
+import org.junit.jupiter.api.Test;
 
 class SchemaTest {
 
@@ -27,9 +27,7 @@ class SchemaTest {
                 "name", "hello",
                 "age", 1,
                 "address", List.of(
-                        Map.of("zip-code", "12-345")
-                )
-        );
+                        Map.of("zip-code", "12-345")));
 
         var result = fromObject(schema, object01);
         var schema1 = result.getLeft();
@@ -41,10 +39,7 @@ class SchemaTest {
                         "name", "hello",
                         "age", 1,
                         "address", List.of(
-                                Map.of("zip-code", "12-345")
-                        )
-                )
-        );
+                                Map.of("zip-code", "12-345"))));
         // schema must be immutable
         assertThat(schema).isEqualTo(Schema.Dict.of());
         // new schema must reflect input object structure
@@ -53,19 +48,14 @@ class SchemaTest {
                         "name", Schema.Primitive.TEXT,
                         "age", Schema.Primitive.BIGINT,
                         "address", Schema.Array.of(Schema.Dict.of(
-                                "zip-code", Schema.Primitive.TEXT
-                        ))
-                )
-        );
+                                "zip-code", Schema.Primitive.TEXT))));
 
         var object02 = Map.of(
                 "name", false,
                 "age", "not available",
                 "address", List.of(
-//                        Map.of("zip-code", List.of(false)),
-                        Map.of("country", "Poland")
-                )
-        );
+                        // Map.of("zip-code", List.of(false)),
+                        Map.of("country", "Poland")));
         var result2 = fromObject(schema1, object02);
         var schema2 = result2.getLeft();
         var object3 = result2.getRight();
@@ -76,31 +66,22 @@ class SchemaTest {
                         "name_bool", false,
                         "age_text", "not available",
                         "address", List.of(
-//                                Map.of("zip-code", List.of(false)),
-                                Map.of("country", "Poland")
-                        )
-                )
-        );
+                                // Map.of("zip-code", List.of(false)),
+                                Map.of("country", "Poland"))));
         // schema must be immutable
         assertThat(schema1).isEqualTo(
                 Schema.Dict.of(
                         "name", Schema.Primitive.TEXT,
                         "age", Schema.Primitive.BIGINT,
                         "address", Schema.Array.of(Schema.Dict.of(
-                                "zip-code", Schema.Primitive.TEXT
-                        ))
-                )
-        );
+                                "zip-code", Schema.Primitive.TEXT))));
         assertThat(schema2).isEqualTo(
                 Schema.Dict.of(
                         "name", Schema.Coli.of(Schema.Primitive.TEXT, Schema.Primitive.BOOLEAN),
                         "age", Schema.Coli.of(Schema.Primitive.BIGINT, Schema.Primitive.TEXT),
                         "address", Schema.Array.of(Schema.Dict.of(
                                 "zip-code", Schema.Primitive.TEXT,
-                                "country", Schema.Primitive.TEXT
-                        ))
-                )
-        );
+                                "country", Schema.Primitive.TEXT))));
     }
 
     private Pair<Schema.I, Object> fromObject(Schema.I schema, Object object) {
@@ -268,6 +249,7 @@ class SchemaTest {
                 case Schema.Coli(Set<Schema.I> setB) -> {
                     var set = new LinkedHashSet<>(setA);
                     for (var i : setB) {
+                        // FIXME flatmap
                         set.add(i);
                     }
 

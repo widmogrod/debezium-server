@@ -5,9 +5,10 @@
  */
 package io.debezium.server.cratedb.schema;
 
-
-import java.util.*;
-
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
 
 public record Schema() {
 
@@ -16,13 +17,16 @@ public record Schema() {
     }
 
     public enum Primitive implements I {
-        BIGINT, BOOLEAN, TEXT
+        BIGINT,
+        BOOLEAN,
+        TEXT
     }
 
     public sealed interface I permits Array, Bit, Coli, Dict, Primitive {
     }
 
     public record Array(I innerType) implements I {
+
         public static Array of(I i) {
             return new Array(i);
         }
@@ -33,6 +37,7 @@ public record Schema() {
     }
 
     public record Dict(Map<Object, I> fields) implements I {
+
         public static Dict of() {
             return of(new LinkedHashMap<>());
         }
@@ -51,12 +56,13 @@ public record Schema() {
     }
 
     public record Coli(Set<I> set) implements I {
+
         public static Coli of(Set<I> set) {
             return new Coli(set);
         }
 
         public static Coli of(I a, I b) {
-            var set  = new LinkedHashSet<I>();
+            var set = new LinkedHashSet<I>();
             // FIXME: a or b can be Coli, flatMap them
             set.add(a);
             set.add(b);
