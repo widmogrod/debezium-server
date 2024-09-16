@@ -13,7 +13,7 @@
 
     <properties>
         <skipITs>true</skipITs>
-        <java.version>21</java.version>
+        <java.version>22</java.version>
     </properties>
 
     <dependencies>
@@ -135,7 +135,7 @@
                 <version>3.5.0</version>
                 <configuration>
                     <excludes>
-                        **/ColumnTypeManager.java, **/SchemaTest.java
+                        **/ColumnTypeManager.java, **/SchemaTest.java, **/Evolution.java
                     </excludes>
                 </configuration>
             </plugin>

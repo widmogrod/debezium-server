@@ -20,6 +20,7 @@ public record Schema() {
     public static I of() {
         return Dict.of();
     }
+
     public enum Primitive implements I {
         BIGINT,
         BOOLEAN,

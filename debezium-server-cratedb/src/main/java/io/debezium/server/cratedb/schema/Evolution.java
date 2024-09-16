@@ -1,6 +1,9 @@
+/*
+ * Copyright Debezium Authors.
+ *
+ * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
+ */
 package io.debezium.server.cratedb.schema;
-
-import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -9,6 +12,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.lang3.tuple.Pair;
+
+/**
+ * Implementation of the schema evolution for CrateDB
+ *
+ * @author Gabriel Habryn
+ */
 public class Evolution {
     public static Pair<Schema.I, Object> fromObject(Schema.I schema, Object object) {
         return switch (object) {

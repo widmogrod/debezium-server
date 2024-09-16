@@ -5,13 +5,13 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import org.junit.jupiter.api.Test;
+import static io.debezium.server.cratedb.schema.Evolution.fromObject;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 import java.util.List;
 import java.util.Map;
 
-import static io.debezium.server.cratedb.schema.Evolution.fromObject;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import org.junit.jupiter.api.Test;
 
 class SchemaTest {
 
