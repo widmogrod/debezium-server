@@ -35,7 +35,9 @@ public record Schema() {
     }}
 
     public record Bit(Number size) implements I {
-
+        public static Bit of(Number size) {
+            return new Bit(size);
+        }
     }
 
     public record Dict(Map<Object, I> fields) implements I {
