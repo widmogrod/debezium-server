@@ -14,6 +14,26 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class SchemaTest {
+    @Test
+    void testNormalizationOfFieldNames() {
+        var schema = Schema.of();
+        var object01 = Map.of(
+                "name.", 1,
+                "name[]", 2,
+                "name{}", 3,
+                "name:", 4
+        );
+
+        var result = fromObject(schema, object01);
+        var object1 = result.getRight();
+
+        assertThat(object1).isEqualTo(Map.of(
+                "name_dot_", 1,
+                "namebkt__bkt", 2,
+                "name{}", 3,
+                "name:", 4
+        ));
+    }
 
     @Test
     void testFirstTransformation() {

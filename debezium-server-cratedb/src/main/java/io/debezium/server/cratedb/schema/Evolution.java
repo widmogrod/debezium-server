@@ -73,6 +73,7 @@ public class Evolution {
 
                 for (var fieldName : x.keySet()) {
                     var fieldValue = x.get(fieldName);
+                    fieldName = normaliseFieldName(fieldName);
                     // find if fieldName exists in schema fields
                     if (fields.containsKey(fieldName)) {
                         var existingType = fields.get(fieldName);
@@ -117,6 +118,17 @@ public class Evolution {
                     "Unknown object match (%s, %s)"
                             .formatted(schema.getClass(), object.getClass()));
         };
+    }
+
+    public static Object normaliseFieldName(Object fieldName) {
+        if (fieldName instanceof String str) {
+            return str.
+                    replaceAll("\\[", "bkt_").
+                    replaceAll("\\]", "_bkt").
+                    replaceAll("\\.", "_dot_");
+        }
+
+        return fieldName;
     }
 
     public static Object typeSuffix(Object fieldName, Schema.I resultSchema, Schema.I detectedType) {
