@@ -13,11 +13,11 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import io.debezium.server.cratedb.ColumnName;
 import io.debezium.server.cratedb.ColumnTypeManager;
 import io.debezium.server.cratedb.CrateTestResourceLifecycleManager;
+import io.debezium.server.cratedb.datagen.DataGen;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -131,7 +131,7 @@ class InformationSchemaLoaderTest {
 
             try (PreparedStatement stmt = conn.prepareStatement("INSERT INTO test(id, doc) VALUES (?, ?)")) {
                 for (int i = 0; i < 10; i++) {
-                    Object object = generateObject();
+                    Object object = DataGen.generateObject();
                     generated.add(object);
 
                     LOGGER.error("BEFORE: {}", object);
@@ -192,90 +192,5 @@ class InformationSchemaLoaderTest {
             manager2.fromInformationSchema(infos2);
             manager2.print();
         });
-    }
-
-    private Object generateObject() {
-        return Map.of(
-                "id", 4,
-                "role", "King",
-                generateKey(), generateValue(),
-                generateRandonChar(), -123.31239);
-    }
-
-    private Object generateValue() {
-        // random value
-        var rand = Math.random();
-        if (rand < 0.20) {
-            return "Queen";
-        }
-        else if (rand < 0.40) {
-            return 666;
-        }
-        else if (rand < 0.60) {
-            return true;
-        }
-        else if (rand < 0.80) {
-            return generateList();
-        }
-        else {
-            return Map.of(
-                    "truth", false,
-                    "lucky", 444);
-        }
-    }
-
-    private String generateKey() {
-        var rand = Math.random();
-        if (rand < 0.25) {
-            return "name";
-        }
-        else if (rand < 0.50) {
-            return "name_" + generateShortTypeName();
-        }
-        else if (rand < 0.75) {
-            return "name_" + generateRandonChar();
-        }
-        else {
-            return generateShortTypeName();
-        }
-    }
-
-    private static List<String> randomChar = List.of("" +
-            "[", ",", ".", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")",
-            "-", "+", "=", "{", "}", "[", "]", "|", "\\",
-            ";", ":", "'", "\"", "<", ">", "?", "/", "~", "`");
-
-    private String generateRandonChar() {
-        return randomChar.get((int) (Math.random() * randomChar.size()));
-    }
-
-    private static List<String> shortTypeNames = List.of(
-            "smallint", "bigint", "integer",
-            "double precision", "real",
-            "timestamp with time zone", "timestamp without time zone",
-            "bit",
-            "ip", "text",
-            "object", "boolean", "character", "float_vector",
-            "geo_point", "geo_shape");
-
-    private String generateShortTypeName() {
-        return shortTypeNames.get((int) (Math.random() * shortTypeNames.size()));
-    }
-
-    private List<Object> generateList() {
-        var rand = Math.random();
-        if (rand < 0.33) {
-            return List.of(
-                    generateValue(),
-                    generateValue(),
-                    generateValue());
-        }
-        else if (rand < 0.66) {
-            var val = generateValue();
-            return List.of(val, val);
-        }
-        else {
-            return List.of();
-        }
     }
 }
