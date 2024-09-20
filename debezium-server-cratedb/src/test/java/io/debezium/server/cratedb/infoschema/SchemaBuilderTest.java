@@ -5,7 +5,11 @@
  */
 package io.debezium.server.cratedb.infoschema;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.debezium.server.cratedb.CrateTestResourceLifecycleManager;
+import io.debezium.server.cratedb.datagen.DataGen;
+import io.debezium.server.cratedb.schema.CrateSQL;
+import io.debezium.server.cratedb.schema.Evolution;
 import io.debezium.server.cratedb.schema.Schema;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -15,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
@@ -92,6 +97,96 @@ class SchemaBuilderTest {
                             "truth", Schema.Primitive.BOOLEAN
                     )
             ));
+        });
+    }
+
+    @Test
+    void withGenerated() {
+        assertDoesNotThrow(() -> {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("DROP TABLE IF EXISTS test");
+                stmt.execute("CREATE TABLE test (id TEXT PRIMARY KEY, doc OBJECT)");
+                stmt.execute("REFRESH TABLE test");
+            }
+
+            var infos1 = DataLoader.withTableName("test").load(conn);
+            assertThat(infos1.isEmpty()).isFalse();
+            for (ColumnInfo info : infos1) {
+                LOGGER.info("info1:{}", info);
+            }
+
+            var manager1 = SchemaBuilder.fromInformationSchema(infos1);
+            LOGGER.info("manager1:{}", manager1);
+
+            ObjectMapper mapper = new ObjectMapper();
+            List<Object> generated = new ArrayList<>();
+
+            try (PreparedStatement stmt = conn.prepareStatement("INSERT INTO test(id, doc) VALUES (?, ?)")) {
+                for (int i = 0; i < 10; i++) {
+                    Object object = DataGen.generateObject();
+                    generated.add(object);
+
+                    LOGGER.error("BEFORE obj: {}", object);
+                    LOGGER.info("BEFORE manager1:{}", manager1);
+
+                    var result1 = Evolution.fromObject(manager1, object);
+                    var schema1 = result1.getLeft();
+                    var object1 = result1.getRight();
+                    var alters = CrateSQL.toSQL("test", manager1, schema1);
+
+                    manager1 = schema1;
+
+                    for (String alter : alters) {
+                        LOGGER.error("ALTER: {}", alter);
+                        try (Statement stmt2 = conn.createStatement()) {
+                            try {
+                                stmt2.execute(alter);
+                            }
+                            catch (Exception e) {
+                                LOGGER.error("ALTER EXCEPTION {}", e.getMessage());
+                            }
+                            stmt2.execute("REFRESH TABLE test");
+                        }
+                    }
+
+                    String json = mapper.writeValueAsString(object1);
+
+                    LOGGER.error("POST: {}", json);
+                    stmt.setString(1, String.valueOf(i));
+                    stmt.setString(2, json);
+                    try {
+                        stmt.execute();
+                    }
+                    catch (Exception e) {
+                        LOGGER.error("BEFORE EXCEPTION:");
+                        LOGGER.info("manager1={}", manager1);
+                        throw e;
+                    }
+
+                    // x ERROR: Dynamic nested arrays are not supported
+                    // x ERROR: "name_." contains a dot
+                    // x ERROR: "[" conflicts with subscript pattern, square brackets are not allowed
+                    // x ERROR: Mixed dataTypes inside a list are not supported. Found object_array and boolean
+                }
+            }
+
+            LOGGER.info("Generated: {}", generated);
+            LOGGER.info("manager1={}", manager1);
+
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("REFRESH TABLE test");
+            }
+
+            var infos2 = DataLoader.withTableName("test").load(conn);
+            assertThat(infos2.isEmpty()).isFalse();
+
+            for (ColumnInfo info : infos2) {
+                LOGGER.info("info2:{}", info);
+            }
+
+            var manager2 = SchemaBuilder.fromInformationSchema(infos2);
+
+            assertThat(manager1).isEqualTo(manager2);
         });
     }
 }
