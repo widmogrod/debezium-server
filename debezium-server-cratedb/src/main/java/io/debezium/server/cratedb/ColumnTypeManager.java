@@ -15,6 +15,8 @@ import java.util.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import io.debezium.server.cratedb.infoschema.InformationSchemaColumnDetails;
+import io.debezium.server.cratedb.infoschema.InformationSchemaColumnInfo;
 import io.debezium.server.cratedb.types.ArrayType;
 import io.debezium.server.cratedb.types.BigIntType;
 import io.debezium.server.cratedb.types.BitType;

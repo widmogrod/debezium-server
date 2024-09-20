@@ -20,14 +20,14 @@ public class CrateSQL {
     public static List<String> toSQL(String tableName, Schema.I beforeSchema, Schema.I afterSchema) {
         // find differences between schemas
         return switch (beforeSchema) {
-            case Schema.Dict(Map<Object, Schema.I> fieldsBefore) -> switch (afterSchema) {
-                case Schema.Dict(Map<Object, Schema.I> fieldsAfter) -> {
+            case Schema.Dict(Map < Object, Schema.I > fieldsBefore) -> switch (afterSchema) {
+                case Schema.Dict(Map < Object, Schema.I > fieldsAfter) -> {
                     var result = new ArrayList<String>();
-//                    if (fieldsBefore.size() == 0) {
-//                        // we have to create table
-//                        var createTable = "CREATE TABLE IF NOT EXISTS" + tableName + " (doc OBJECT(DYNAMIC) WITH (column_policy = 'dynamic')";
-//                        result.add(createTable);
-//                    }
+                    // if (fieldsBefore.size() == 0) {
+                    // // we have to create table
+                    // var createTable = "CREATE TABLE IF NOT EXISTS" + tableName + " (doc OBJECT(DYNAMIC) WITH (column_policy = 'dynamic')";
+                    // result.add(createTable);
+                    // }
                     // get fields are new inf after schema
                     // don't delete fields if they don't exist
                     for (var after : fieldsAfter.entrySet()) {
