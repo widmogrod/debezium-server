@@ -18,7 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * @author Gabriel Habryn
  */
-public class InformationSchemaLoader {
+public class DataLoader {
     public static final String INFO_SQL = """
             SELECT c.column_details
                  , c.column_name
@@ -37,25 +37,25 @@ public class InformationSchemaLoader {
     private final String tableName;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    private InformationSchemaLoader(String tableName) {
+    private DataLoader(String tableName) {
         this.tableName = tableName;
     }
 
-    public static InformationSchemaLoader withTableName(String tableName) {
-        return new InformationSchemaLoader(tableName);
+    public static DataLoader withTableName(String tableName) {
+        return new DataLoader(tableName);
     }
 
-    public List<InformationSchemaColumnInfo> load(Connection conn) throws SQLException, JsonProcessingException {
-        List<InformationSchemaColumnInfo> infos = new LinkedList<>();
+    public List<ColumnInfo> load(Connection conn) throws SQLException, JsonProcessingException {
+        List<ColumnInfo> infos = new LinkedList<>();
         try (var stmt = conn.prepareStatement(INFO_SQL)) {
             stmt.setString(1, this.tableName);
             try (var resultSet = stmt.executeQuery()) {
                 while (resultSet.next()) {
                     String json = resultSet.getString("column_details");
 
-                    var details = mapper.readValue(json, InformationSchemaColumnDetails.class);
+                    var details = mapper.readValue(json, ColumnDetails.class);
 
-                    var info = new InformationSchemaColumnInfo.Builder().setColumnName(resultSet.getString("column_name")).setDataType(resultSet.getString("data_type"))
+                    var info = new ColumnInfo.Builder().setColumnName(resultSet.getString("column_name")).setDataType(resultSet.getString("data_type"))
                             .setColumnDetails(details).setIsPrimaryKey(resultSet.getBoolean("is_primary_key"))
                             .setCharacterMaximumLength(resultSet.getInt("character_maximum_length")).build();
 

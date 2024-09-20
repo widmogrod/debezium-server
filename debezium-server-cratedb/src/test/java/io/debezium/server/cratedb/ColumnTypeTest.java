@@ -19,8 +19,8 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.debezium.server.cratedb.infoschema.InformationSchemaColumnDetails;
-import io.debezium.server.cratedb.infoschema.InformationSchemaColumnInfo;
+import io.debezium.server.cratedb.infoschema.ColumnDetails;
+import io.debezium.server.cratedb.infoschema.ColumnInfo;
 import io.debezium.server.cratedb.types.ArrayType;
 import io.debezium.server.cratedb.types.BigIntType;
 import io.debezium.server.cratedb.types.ColumnType;
@@ -32,40 +32,40 @@ class ColumnTypeTest {
     void testComposition() {
         ColumnTypeManager manager = new ColumnTypeManager();
         var info = manager.addColumn(new ColumnName("id"), new BigIntType());
-        assertThat(info).isEqualTo(new ColumnInfo(false, new ColumnName("id")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("id")));
 
         info = manager.addColumn(new ColumnName("name"), new TextType());
-        assertThat(info).isEqualTo(new ColumnInfo(false, new ColumnName("name")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("name")));
 
         info = manager.addColumn(new ColumnName("name"), new ArrayType(new TextType()));
-        assertThat(info).isEqualTo(new ColumnInfo(false, new ColumnName("name_text_array")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("name_text_array")));
 
         info = manager.addColumn(new ColumnName("cars"), new ArrayType(new ObjectType()));
-        assertThat(info).isEqualTo(new ColumnInfo(false, new ColumnName("cars")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("cars")));
 
         info = manager.addColumn(new ColumnName("cars"), new BigIntType());
-        assertThat(info).isEqualTo(new ColumnInfo(false, new ColumnName("cars_bigint")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("cars_bigint")));
 
         info = manager.addColumn(new ColumnName("cars"), new ArrayType(new BigIntType()));
-        assertThat(info).isEqualTo(new ColumnInfo(false, new ColumnName("cars_bigint_array")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("cars_bigint_array")));
 
         info = manager.addColumn(new ColumnName("cars"), new ArrayType(new ArrayType(new BigIntType())));
-        assertThat(info).isEqualTo(new ColumnInfo(false, new ColumnName("cars_bigint_array_array")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("cars_bigint_array_array")));
 
         info = manager.addColumn(new ColumnName("cars"), ObjectType.of(new ColumnName("oid"), new BigIntType()));
-        assertThat(info).isEqualTo(new ColumnInfo(false, new ColumnName("cars_object")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("cars_object")));
 
         info = manager.addColumn(new ColumnName("cars"), new ObjectType());
-        assertThat(info).isEqualTo(new ColumnInfo(false, new ColumnName("cars_object")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("cars_object")));
 
         info = manager.addColumn(new ColumnName("cars"), ObjectType.of(new ColumnName("did"), new BigIntType()));
-        assertThat(info).isEqualTo(new ColumnInfo(false, new ColumnName("cars_object")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("cars_object")));
 
         info = manager.addColumn(new ColumnName("mars"), new ArrayType(new ArrayType(new ArrayType(ObjectType.of(new ColumnName("did"), new BigIntType())))));
-        assertThat(info).isEqualTo(new ColumnInfo(false, new ColumnName("mars")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("mars")));
 
         info = manager.addColumn(new ColumnName("mars"), new ArrayType(new ArrayType(new ArrayType(ObjectType.of(new ColumnName("did"), new TextType())))));
-        assertThat(info).isEqualTo(new ColumnInfo(false, new ColumnName("mars")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("mars")));
 
         manager.print();
     }
@@ -218,32 +218,32 @@ class ColumnTypeTest {
     void testInformationSchema() {
         ColumnTypeManager manager = new ColumnTypeManager();
 
-        List<InformationSchemaColumnInfo> infos = List.of(
-                new InformationSchemaColumnInfo.Builder()
+        List<ColumnInfo> infos = List.of(
+                new ColumnInfo.Builder()
                         .setDataType("object")
                         .setColumnName("doc")
-                        .setColumnDetails(new InformationSchemaColumnDetails(
+                        .setColumnDetails(new ColumnDetails(
                                 "doc",
                                 List.of()))
                         .build(),
-                new InformationSchemaColumnInfo.Builder()
+                new ColumnInfo.Builder()
                         .setDataType("text")
                         .setColumnName("doc['name']")
-                        .setColumnDetails(new InformationSchemaColumnDetails(
+                        .setColumnDetails(new ColumnDetails(
                                 "doc",
                                 List.of("name")))
                         .build(),
-                new InformationSchemaColumnInfo.Builder()
+                new ColumnInfo.Builder()
                         .setDataType("bigint_array")
                         .setColumnName("doc['name_bigint_array']")
-                        .setColumnDetails(new InformationSchemaColumnDetails(
+                        .setColumnDetails(new ColumnDetails(
                                 "doc",
                                 List.of("name_bigint_array")))
                         .build(),
-                new InformationSchemaColumnInfo.Builder()
+                new ColumnInfo.Builder()
                         .setDataType("bigint_array")
                         .setColumnName("arr")
-                        .setColumnDetails(new InformationSchemaColumnDetails(
+                        .setColumnDetails(new ColumnDetails(
                                 "arr",
                                 List.of()))
                         .build());
@@ -256,11 +256,11 @@ class ColumnTypeTest {
     void testInformationSchema2() {
         ColumnTypeManager manager = new ColumnTypeManager();
 
-        List<InformationSchemaColumnInfo> infos = List.of(
-                new InformationSchemaColumnInfo.Builder()
+        List<ColumnInfo> infos = List.of(
+                new ColumnInfo.Builder()
                         .setDataType("object")
                         .setColumnName("doc")
-                        .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of()))
+                        .setColumnDetails(new ColumnDetails("doc", List.of()))
                         .setIsPrimaryKey(false)
                         .setCharacterMaximumLength(0)
                         .build(),
@@ -334,10 +334,10 @@ class ColumnTypeTest {
                 // .setIsPrimaryKey(false)
                 // .setCharacterMaximumLength(0)
                 // .build(),
-                new InformationSchemaColumnInfo.Builder()
+                new ColumnInfo.Builder()
                         .setDataType("bigint")
                         .setColumnName("doc['character']")
-                        .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("character")))
+                        .setColumnDetails(new ColumnDetails("doc", List.of("character")))
                         .setIsPrimaryKey(false)
                         .setCharacterMaximumLength(0)
                         .build(),
@@ -370,26 +370,26 @@ class ColumnTypeTest {
                 // .setCharacterMaximumLength(0)
                 // .build(),
 
-                new InformationSchemaColumnInfo.Builder()
+                new ColumnInfo.Builder()
                         .setDataType("object_array")
                         .setColumnName("doc['character_object_array']")
-                        .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("character_object_array")))
+                        .setColumnDetails(new ColumnDetails("doc", List.of("character_object_array")))
                         .setIsPrimaryKey(false)
                         .setCharacterMaximumLength(0)
                         .build(),
 
-                new InformationSchemaColumnInfo.Builder()
+                new ColumnInfo.Builder()
                         .setDataType("bigint")
                         .setColumnName("doc['character_object_array']['lucky']")
-                        .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("character_object_array", "lucky")))
+                        .setColumnDetails(new ColumnDetails("doc", List.of("character_object_array", "lucky")))
                         .setIsPrimaryKey(false)
                         .setCharacterMaximumLength(0)
                         .build(),
 
-                new InformationSchemaColumnInfo.Builder()
+                new ColumnInfo.Builder()
                         .setDataType("boolean")
                         .setColumnName("doc['character_object_array']['truth']")
-                        .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("character_object_array", "truth")))
+                        .setColumnDetails(new ColumnDetails("doc", List.of("character_object_array", "truth")))
                         .setIsPrimaryKey(false)
                         .setCharacterMaximumLength(0)
                         .build()
@@ -454,19 +454,19 @@ class ColumnTypeTest {
         TypeCollision collision = new TypeCollision();
         var info = collision.putType(
                 new ObjectType(),
-                new ColumnInfo(true, new ColumnName("name")));
+                new io.debezium.server.cratedb.ColumnInfo(true, new ColumnName("name")));
 
-        assertThat(info).isEqualTo(new ColumnInfo(true, new ColumnName("name")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(true, new ColumnName("name")));
 
         info = collision.putType(
                 new ObjectType(),
-                new ColumnInfo(false, new ColumnName("name")));
-        assertThat(info).isEqualTo(new ColumnInfo(true, new ColumnName("name")));
+                new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("name")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(true, new ColumnName("name")));
 
         info = collision.putType(
                 ObjectType.of(new ColumnName("did"), new BigIntType()),
-                new ColumnInfo(false, new ColumnName("name")));
-        assertThat(info).isEqualTo(new ColumnInfo(true, new ColumnName("name")));
+                new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("name")));
+        assertThat(info).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(true, new ColumnName("name")));
 
         ColumnTypeManager manager = new ColumnTypeManager();
         manager.putCollision(new ColumnName("name"), collision);
@@ -496,20 +496,20 @@ class ColumnTypeTest {
     @Test
     void testObjectPutAndTry() {
         ObjectType objectType = new ObjectType();
-        ColumnInfo columnInfo = objectType.putColumnNameWithType(new ColumnName("name"), new BigIntType());
-        assertThat(columnInfo).isEqualTo(new ColumnInfo(false, new ColumnName("name")));
+        io.debezium.server.cratedb.ColumnInfo columnInfo = objectType.putColumnNameWithType(new ColumnName("name"), new BigIntType());
+        assertThat(columnInfo).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("name")));
 
-        ColumnInfo columnInfo2 = objectType.putColumnNameWithType(new ColumnName("name"), new ArrayType(new BigIntType()));
-        assertThat(columnInfo2).isEqualTo(new ColumnInfo(false, new ColumnName("name_bigint_array")));
+        io.debezium.server.cratedb.ColumnInfo columnInfo2 = objectType.putColumnNameWithType(new ColumnName("name"), new ArrayType(new BigIntType()));
+        assertThat(columnInfo2).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("name_bigint_array")));
 
-        Optional<Pair<ColumnType, ColumnInfo>> pair = objectType.tryGetColumnInfoOf(new ColumnName("name"), new BigIntType());
+        Optional<Pair<ColumnType, io.debezium.server.cratedb.ColumnInfo>> pair = objectType.tryGetColumnInfoOf(new ColumnName("name"), new BigIntType());
         assertThat(pair).isPresent();
-        assertThat(pair.get().getRight()).isEqualTo(new ColumnInfo(false, new ColumnName("name")));
+        assertThat(pair.get().getRight()).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("name")));
         assertThat(pair.get().getLeft()).isEqualTo(new BigIntType());
 
-        Optional<Pair<ColumnType, ColumnInfo>> pair2 = objectType.tryGetColumnInfoOf(new ColumnName("name"), new ArrayType(new BigIntType()));
+        Optional<Pair<ColumnType, io.debezium.server.cratedb.ColumnInfo>> pair2 = objectType.tryGetColumnInfoOf(new ColumnName("name"), new ArrayType(new BigIntType()));
         assertThat(pair2).isPresent();
-        assertThat(pair2.get().getRight()).isEqualTo(new ColumnInfo(false, new ColumnName("name_bigint_array")));
+        assertThat(pair2.get().getRight()).isEqualTo(new io.debezium.server.cratedb.ColumnInfo(false, new ColumnName("name_bigint_array")));
         assertThat(pair2.get().getLeft()).isEqualTo(new ArrayType(new BigIntType()));
     }
 }

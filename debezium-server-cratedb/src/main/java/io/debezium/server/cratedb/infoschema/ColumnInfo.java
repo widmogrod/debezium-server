@@ -5,47 +5,14 @@
  */
 package io.debezium.server.cratedb.infoschema;
 
-public record InformationSchemaColumnInfo(
-//        String udtSchema,
-//        String udtName,
-//        String udtCatalog,
-//        String tableSchema,
-//        String tableName,
-//        String tableCatalog,
-//        Integer ordinalPosition,
-//        Integer numericScale,
-//        Integer numericPrecisionRadix,
-//        Integer numericPrecision,
-//        Boolean isNullable,
-//        Boolean isIdentity,
-//        String isGenerated,
-//        String intervalType,
-//        Integer intervalPrecision,
-//        String identityStart,
-//        String identityMinimum,
-//        String identityMaximum,
-//        String identityIncrement,
-//        String identityGeneration,
-//        Boolean identityCycle,
-//        String generationExpression,
-//        String domainSchema,
-//        String domainName,
-//        String domainCatalog,
-//        Integer datetimePrecision,
+/**
+ * Represents information about a column in a database table.
+ */
+public record ColumnInfo(
         String dataType,
         String columnName,
-        InformationSchemaColumnDetails columnDetails,
+        ColumnDetails columnDetails,
         Boolean isPrimaryKey,
-//        String columnDefault,
-//        String collationSchema,
-//        String collationName,
-//        String collationCatalog,
-//        String checkReferences,
-//        Integer checkAction,
-//        String characterSetSchema,
-//        String characterSetName,
-//        String characterSetCatalog,
-//        Integer characterOctetLength,
         Integer characterMaximumLength
 ) {
 
@@ -53,8 +20,8 @@ public record InformationSchemaColumnInfo(
         return dataType.endsWith("_array");
     }
 
-    public InformationSchemaColumnInfo subArray() {
-        return new InformationSchemaColumnInfo(
+    public ColumnInfo subArray() {
+        return new ColumnInfo(
                 dataType.substring(0, dataType.length() - "_array".length()),
                 columnName,
                 columnDetails,
@@ -66,7 +33,7 @@ public record InformationSchemaColumnInfo(
     public static class Builder {
         private String dataType;
         private String columnName;
-        private InformationSchemaColumnDetails columnDetails;
+        private ColumnDetails columnDetails;
         private Boolean isPrimaryKey = false;
         private Integer characterMaximumLength = 0;
 
@@ -80,7 +47,7 @@ public record InformationSchemaColumnInfo(
             return this;
         }
 
-        public Builder setColumnDetails(InformationSchemaColumnDetails columnDetails) {
+        public Builder setColumnDetails(ColumnDetails columnDetails) {
             this.columnDetails = columnDetails;
             return this;
         }
@@ -95,8 +62,8 @@ public record InformationSchemaColumnInfo(
             return this;
         }
 
-        public InformationSchemaColumnInfo build() {
-            return new InformationSchemaColumnInfo(
+        public ColumnInfo build() {
+            return new ColumnInfo(
                     dataType,
                     columnName,
                     columnDetails,

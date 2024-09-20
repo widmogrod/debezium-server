@@ -15,8 +15,8 @@ import java.util.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.debezium.server.cratedb.infoschema.InformationSchemaColumnDetails;
-import io.debezium.server.cratedb.infoschema.InformationSchemaColumnInfo;
+import io.debezium.server.cratedb.infoschema.ColumnDetails;
+import io.debezium.server.cratedb.infoschema.ColumnInfo;
 import io.debezium.server.cratedb.types.ArrayType;
 import io.debezium.server.cratedb.types.BigIntType;
 import io.debezium.server.cratedb.types.BitType;
@@ -112,11 +112,11 @@ public class ColumnTypeManager {
         };
     }
 
-    public void fromInformationSchema(List<InformationSchemaColumnInfo> columns) {
-        for (InformationSchemaColumnInfo column : columns) {
+    public void fromInformationSchema(List<ColumnInfo> columns) {
+        for (ColumnInfo column : columns) {
             ColumnType columnType = getColumnType(column);
 
-            InformationSchemaColumnDetails detail = column.columnDetails();
+            ColumnDetails detail = column.columnDetails();
             ColumnName columnName = ColumnName.normalized(detail.name(), columnType);
 
             if (!detail.path().isEmpty()) {
@@ -193,7 +193,7 @@ public class ColumnTypeManager {
         }
     }
 
-    private static ColumnType getColumnType(InformationSchemaColumnInfo column) {
+    private static ColumnType getColumnType(ColumnInfo column) {
         return switch (column.dataType()) {
             case "smallint", "bigint", "integer" -> new BigIntType();
             case "double precision", "real" -> new FloatType();
@@ -511,7 +511,7 @@ public class ColumnTypeManager {
         };
     }
 
-    public ColumnInfo addColumn(ColumnName columnName, ColumnType columnType) {
+    public io.debezium.server.cratedb.ColumnInfo addColumn(ColumnName columnName, ColumnType columnType) {
         return schema.putColumnNameWithType(columnName, columnType);
     }
 

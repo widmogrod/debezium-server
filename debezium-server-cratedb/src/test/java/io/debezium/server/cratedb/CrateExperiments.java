@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.debezium.server.cratedb.infoschema.InformationSchemaLoader;
+import io.debezium.server.cratedb.infoschema.DataLoader;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 
@@ -424,7 +424,7 @@ public class CrateExperiments {
                     LOGGER.error("Error writing to CSV file: {}", e.getMessage());
                 }
 
-                var info = InformationSchemaLoader.withTableName("test").load(conn);
+                var info = DataLoader.withTableName("test").load(conn);
 
                 for (var elem : info) {
                     LOGGER.error("Column details: {}", elem);

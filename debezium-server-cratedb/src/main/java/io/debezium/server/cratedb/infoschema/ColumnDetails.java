@@ -7,6 +7,8 @@ package io.debezium.server.cratedb.infoschema;
 
 import java.util.List;
 
-// Nested record for column_details
-public record InformationSchemaColumnDetails(String name, List<String> path) {
+/**
+ * Represents the details of a column in a database table.
+ */
+public record ColumnDetails(String name, List<String> path) {
 }

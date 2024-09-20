@@ -67,42 +67,42 @@ class InformationSchemaLoaderTest {
                 stmt.execute("REFRESH TABLE test");
             }
 
-            var infos = InformationSchemaLoader.withTableName("test").load(conn);
+            var infos = DataLoader.withTableName("test").load(conn);
             assertThat(infos.isEmpty()).isFalse();
 
             assertEquals(infos.size(), 5);
-            for (InformationSchemaColumnInfo info : infos) {
+            for (ColumnInfo info : infos) {
                 LOGGER.info("{}", info);
             }
-            assertThat(infos.get(0)).isEqualTo(new InformationSchemaColumnInfo.Builder()
+            assertThat(infos.get(0)).isEqualTo(new ColumnInfo.Builder()
                     .setDataType("text")
                     .setColumnName("id")
-                    .setColumnDetails(new InformationSchemaColumnDetails("id", List.of()))
+                    .setColumnDetails(new ColumnDetails("id", List.of()))
                     .setIsPrimaryKey(true)
                     .build());
 
-            assertThat(infos.get(1)).isEqualTo(new InformationSchemaColumnInfo.Builder()
+            assertThat(infos.get(1)).isEqualTo(new ColumnInfo.Builder()
                     .setDataType("object")
                     .setColumnName("doc")
-                    .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of()))
+                    .setColumnDetails(new ColumnDetails("doc", List.of()))
                     .build());
 
-            assertThat(infos.get(2)).isEqualTo(new InformationSchemaColumnInfo.Builder()
+            assertThat(infos.get(2)).isEqualTo(new ColumnInfo.Builder()
                     .setDataType("text")
                     .setColumnName("doc['name']")
-                    .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("name")))
+                    .setColumnDetails(new ColumnDetails("doc", List.of("name")))
                     .build());
 
-            assertThat(infos.get(3)).isEqualTo(new InformationSchemaColumnInfo.Builder()
+            assertThat(infos.get(3)).isEqualTo(new ColumnInfo.Builder()
                     .setDataType("bigint_array")
                     .setColumnName("doc['name_bigint_array']")
-                    .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("name_bigint_array")))
+                    .setColumnDetails(new ColumnDetails("doc", List.of("name_bigint_array")))
                     .build());
 
-            assertThat(infos.get(4)).isEqualTo(new InformationSchemaColumnInfo.Builder()
+            assertThat(infos.get(4)).isEqualTo(new ColumnInfo.Builder()
                     .setDataType("boolean")
                     .setColumnName("doc['truth']")
-                    .setColumnDetails(new InformationSchemaColumnDetails("doc", List.of("truth")))
+                    .setColumnDetails(new ColumnDetails("doc", List.of("truth")))
                     .build());
         });
     }
@@ -116,9 +116,9 @@ class InformationSchemaLoaderTest {
                 stmt.execute("REFRESH TABLE test");
             }
 
-            var infos1 = InformationSchemaLoader.withTableName("test").load(conn);
+            var infos1 = DataLoader.withTableName("test").load(conn);
             assertThat(infos1.isEmpty()).isFalse();
-            for (InformationSchemaColumnInfo info : infos1) {
+            for (ColumnInfo info : infos1) {
                 LOGGER.info("{}", info);
             }
 
@@ -181,10 +181,10 @@ class InformationSchemaLoaderTest {
                 stmt.execute("REFRESH TABLE test");
             }
 
-            var infos2 = InformationSchemaLoader.withTableName("test").load(conn);
+            var infos2 = DataLoader.withTableName("test").load(conn);
             assertThat(infos2.isEmpty()).isFalse();
 
-            for (InformationSchemaColumnInfo info : infos2) {
+            for (ColumnInfo info : infos2) {
                 LOGGER.info("{}", info);
             }
 
