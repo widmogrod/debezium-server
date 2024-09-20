@@ -26,6 +26,10 @@ public class Evolution {
                 case Schema.Primitive.BIGINT -> Pair.of(schema, object);
                 default -> Pair.of(merge(schema, detectType(object)), object);
             };
+            case Double ignored -> switch (schema) {
+                case Schema.Primitive.DOUBLE -> Pair.of(schema, object);
+                default -> Pair.of(merge(schema, detectType(object)), object);
+            };
             case String ignored -> switch (schema) {
                 case Schema.Primitive.TEXT -> Pair.of(schema, object);
                 default -> Pair.of(merge(schema, detectType(object)), object);
@@ -200,6 +204,7 @@ public class Evolution {
             case Schema.Dict ignored -> "object";
             case Schema.Primitive primitive -> switch (primitive) {
                 case BIGINT -> "int";
+                case DOUBLE -> "double";
                 case BOOLEAN -> "bool";
                 case TEXT -> "text";
                 case TIMETZ -> "tz";
@@ -212,6 +217,7 @@ public class Evolution {
         return switch (fieldValue) {
             case String ignored -> Schema.Primitive.TEXT;
             case Integer ignored -> Schema.Primitive.BIGINT;
+            case Double ignored -> Schema.Primitive.DOUBLE;
             case Boolean ignored -> Schema.Primitive.BOOLEAN;
             case List of -> Schema.Array.of(detectType(of.getFirst()));
             case Map ignored -> Schema.Dict.of();

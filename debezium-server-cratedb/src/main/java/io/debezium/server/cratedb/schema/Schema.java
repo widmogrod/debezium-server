@@ -23,6 +23,7 @@ public record Schema() {
 
     public enum Primitive implements I {
         BIGINT,
+        DOUBLE,
         BOOLEAN,
         TEXT,
         TIMETZ

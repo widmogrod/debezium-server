@@ -50,7 +50,7 @@ public class SchemaBuilder {
     private static Schema.I getColumnType(ColumnInfo column) {
         return switch (column.dataType()) {
             case "smallint", "bigint", "integer" -> Schema.Primitive.BIGINT;
-//            case "double precision", "real" -> Schema.Primitive.DOUBLE;
+            case "double precision", "real" -> Schema.Primitive.DOUBLE;
             case "timestamp with time zone", "timestamp without time zone" -> Schema.Primitive.TIMETZ;
             case "bit" -> Schema.Bit.of(column.characterMaximumLength());
             case "ip", "text" -> Schema.Primitive.TEXT;

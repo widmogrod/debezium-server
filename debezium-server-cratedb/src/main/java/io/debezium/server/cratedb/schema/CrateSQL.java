@@ -112,6 +112,7 @@ public class CrateSQL {
             case Schema.Dict ignored -> "OBJECT(DYNAMIC)";
             case Schema.Primitive primitive -> switch (primitive) {
                 case BIGINT -> "BIGINT";
+                case DOUBLE -> "DOUBLE";
                 case BOOLEAN -> "BOOLEAN";
                 case TEXT -> "TEXT";
                 case TIMETZ -> "TIMETZ";
