@@ -25,13 +25,15 @@ public class SchemaBuilder {
             var fieldType = getColumnType(column);
 
             var details = column.columnDetails();
-            if (!details.path().isEmpty()) {
-                // traverse list in reverse order
-                var list = details.path();
-                for (var i = list.size() - 1; i >= 0; i--) {
-                    fieldType = Schema.Dict.of(list.get(i), fieldType);
+            if (details != null) {
+                if (!details.path().isEmpty()) {
+                    // traverse list in reverse order
+                    var list = details.path();
+                    for (var i = list.size() - 1; i >= 0; i--) {
+                        fieldType = Schema.Dict.of(list.get(i), fieldType);
+                    }
+                    fieldName = details.name();
                 }
-                fieldName = details.name();
             }
 
             if (fields.containsKey(fieldName)) {
