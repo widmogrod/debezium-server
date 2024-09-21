@@ -20,8 +20,8 @@ public class CrateSQL {
     public static List<String> toSQL(String tableName, Schema.I beforeSchema, Schema.I afterSchema) {
         // find differences between schemas
         return switch (beforeSchema) {
-            case Schema.Dict(Map < Object, Schema.I > fieldsBefore) -> switch (afterSchema) {
-                case Schema.Dict(Map < Object, Schema.I > fieldsAfter) -> {
+            case Schema.Dict(Map<Object, Schema.I> fieldsBefore) -> switch (afterSchema) {
+                case Schema.Dict(Map<Object, Schema.I> fieldsAfter) -> {
                     var result = new ArrayList<String>();
                     // if (fieldsBefore.size() == 0) {
                     // // we have to create table
@@ -58,12 +58,12 @@ public class CrateSQL {
         };
     }
 
-    public static Map<List<Object>, Schema.Array> extractNestedArrayTypes(List<Object> path, Schema.I schema) {
+
+    public static Map<List<Object>, Schema.I> extractNestedArrayTypes(List<Object> path, Schema.I schema) {
         return switch (schema) {
             case Schema.Dict(Map<Object, Schema.I> fields) -> {
-                Map<List<Object>, Schema.Array> result = new HashMap<>();
+                Map<List<Object>, Schema.I> result = new HashMap<>();
                 for (var entry : fields.entrySet()) {
-                    // iterate over type collisions
                     var fieldName = entry.getKey();
                     var fieldValue = entry.getValue();
 
@@ -78,14 +78,14 @@ public class CrateSQL {
                 yield result;
             }
 
-            case Schema.Array arr -> switch (arr.innerType()) {
-                case Schema.Array (Schema.I innerType2) -> {
-                    var nested = extractNestedArrayTypes(new ArrayList<>(path), innerType2);
-                    nested.put(path, arr);
-                    yield nested;
-                }
-                default -> new HashMap<>();
-            };
+            case Schema.Array arr -> {
+                var nested = extractNestedArrayTypes(new ArrayList<>(path), arr.innerType());
+                nested.put(path, arr);
+                yield nested;
+            }
+            case Schema.Coli ignored -> new HashMap() {{
+                put(path, schema);
+            }};
             default -> new HashMap<>();
         };
     }
@@ -103,10 +103,7 @@ public class CrateSQL {
 
     public static String sqlColumnType(Schema.I columnType) {
         return switch (columnType) {
-            case Schema.Array(Schema.I innerType) -> switch (innerType) {
-                case Schema.Coli ignored -> "OBJECT(IGNORED)";
-                default -> "ARRAY(" + sqlColumnType(innerType) + ")";
-            };
+            case Schema.Array(Schema.I innerType) -> "ARRAY(" + sqlColumnType(innerType) + ")";
             case Schema.Bit(Number size) -> "BIT(" + size + ")";
             case Schema.Coli ignored -> "OBJECT(IGNORED)";
             case Schema.Dict ignored -> "OBJECT(DYNAMIC)";
