@@ -21,7 +21,8 @@ class SchemaTest {
                 "name.", 1,
                 "name[]", 2,
                 "name{}", 3,
-                "name:", 4
+                "name:", 4,
+                "name;", 5
         );
 
         var result = fromObject(schema, object01);
@@ -31,7 +32,8 @@ class SchemaTest {
                 "name_dot_", 1,
                 "namebkt__bkt", 2,
                 "name{}", 3,
-                "name:", 4
+                "name:", 4,
+                "name_semicolon_", 5
         ));
     }
 
