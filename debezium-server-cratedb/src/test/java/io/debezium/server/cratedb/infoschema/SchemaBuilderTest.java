@@ -23,7 +23,6 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.Assert.assertEquals;
@@ -103,11 +102,8 @@ class SchemaBuilderTest {
 
     @Test
     void withGenerated() {
-        DataGen.setSeed(123456789);
         // set randomness seed
-        Random rand = new Random();
-        rand.setSeed(123456789);
-        // print it
+        DataGen.setSeed(123456789);
 
         assertDoesNotThrow(() -> {
             try (Statement stmt = conn.createStatement()) {
@@ -180,8 +176,8 @@ class SchemaBuilderTest {
                     }
 
                     // x ERROR: Dynamic nested arrays are not supported
-                    // x ERROR: "name_." contains a dot
-                    // x ERROR: "[" conflicts with subscript pattern, square brackets are not allowed
+                    // v ERROR: "name_." contains a dot
+                    // v ERROR: "[" conflicts with subscript pattern, square brackets are not allowed
                     // x ERROR: Mixed dataTypes inside a list are not supported. Found object_array and boolean
                 }
             }
