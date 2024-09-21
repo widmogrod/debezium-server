@@ -7,6 +7,7 @@ package io.debezium.server.cratedb.datagen;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 /**
  * Data generation utils, to explore permutations of data
@@ -14,6 +15,8 @@ import java.util.Map;
  * @author Gabriel Habryn
  */
 public class DataGen {
+    private static final Random random = new Random();
+
     static final public List<String> randomChar = List.of(
             "" +
             "[", ",", ".", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")",
@@ -29,6 +32,10 @@ public class DataGen {
             "object", "boolean", "character", "float_vector",
             "geo_point", "geo_shape");
 
+    public static void setSeed(long seed) {
+        random.setSeed(seed);
+    }
+
     static public Object generateObject() {
         return Map.of(
                 "id", 4,
@@ -39,7 +46,7 @@ public class DataGen {
 
     static public Object generateValue() {
         // random value
-        var rand = Math.random();
+        double rand = random.nextDouble();
         if (rand < 0.20) {
             return "Queen";
         }
@@ -60,7 +67,7 @@ public class DataGen {
     }
 
     static public String generateKey() {
-        var rand = Math.random();
+        double rand = random.nextDouble();
         if (rand < 0.25) {
             return "name";
         }
@@ -76,15 +83,15 @@ public class DataGen {
     }
 
     static public String generateRandomChar() {
-        return randomChar.get((int) (Math.random() * randomChar.size()));
+        return randomChar.get(random.nextInt(randomChar.size()));
     }
 
     static public String generateShortTypeName() {
-        return shortTypeNames.get((int) (Math.random() * shortTypeNames.size()));
+        return shortTypeNames.get(random.nextInt(shortTypeNames.size()));
     }
 
     static public List<Object> generateList() {
-        var rand = Math.random();
+        double rand = random.nextDouble();
         if (rand < 0.33) {
             return List.of(
                     generateValue(),
