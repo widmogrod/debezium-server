@@ -70,6 +70,12 @@ public class Evolution {
 
                     for (var fieldName : x.keySet()) {
                         var fieldValue = x.get(fieldName);
+
+                        // empty arrays, or null values
+                        if (shouldShipValue(fieldValue)) {
+                            continue;
+                        }
+
                         fieldName = normaliseFieldName(fieldName);
                         // find if fieldName exists in schema fields
                         if (fields.containsKey(fieldName)) {
@@ -119,6 +125,18 @@ public class Evolution {
         };
     }
 
+    public static boolean shouldShipValue(Object fieldValue) {
+        if (fieldValue == null) {
+            return true;
+        }
+
+        if (fieldValue instanceof List list && list.isEmpty()) {
+            return true;
+        }
+
+        return false;
+    }
+
     public static Object normaliseFieldName(Object fieldName) {
         if (fieldName instanceof String str) {
             return str.
@@ -162,30 +180,6 @@ public class Evolution {
             case Schema.Primitive.NULL -> null;
             default -> data;
         };
-    }
-
-    public static Object typeSuffix(Object fieldName, Schema.I resultSchema, Schema.I detectedType) {
-        if (resultSchema != detectedType) {
-            if (resultSchema instanceof Schema.Coli coli) {
-                var first = coli.set().stream().findFirst();
-                // when first type of collision is the same as detectedType,
-                // then means that that's an original type
-                if (first.isPresent()) {
-                    return typeSuffix(fieldName, first.get(), detectedType);
-                }
-            }
-            else if (resultSchema instanceof Schema.Array aArray && detectedType instanceof Schema.Array bArray) {
-                var result = typeSuffix(fieldName, aArray.innerType(), bArray.innerType());
-                if (result != fieldName) {
-                    return result + "_array";
-                }
-            }
-            else if (!(resultSchema instanceof Schema.Dict && detectedType instanceof Schema.Dict)) {
-                return fieldName.toString() + "_" + suffixType(detectedType);
-            }
-        }
-
-        return fieldName;
     }
 
     public static Schema.I merge(Schema.I a, Schema.I b) {
@@ -242,9 +236,33 @@ public class Evolution {
         };
     }
 
-    public static String suffixType(Schema.I type) {
+    public static Object typeSuffix(Object fieldName, Schema.I resultSchema, Schema.I detectedType) {
+        if (resultSchema != detectedType) {
+            if (resultSchema instanceof Schema.Coli coli) {
+                var first = coli.set().stream().findFirst();
+                // when first type of collision is the same as detectedType,
+                // then means that that's an original type
+                if (first.isPresent()) {
+                    return typeSuffix(fieldName, first.get(), detectedType);
+                }
+            }
+            else if (resultSchema instanceof Schema.Array aArray && detectedType instanceof Schema.Array bArray) {
+                var result = typeSuffix(fieldName, aArray.innerType(), bArray.innerType());
+                if (result != fieldName) {
+                    return result + "_array";
+                }
+            }
+            else if (!(resultSchema instanceof Schema.Dict && detectedType instanceof Schema.Dict)) {
+                return fieldName.toString() + "_" + typeSuffix(detectedType);
+            }
+        }
+
+        return fieldName;
+    }
+
+    public static String typeSuffix(Schema.I type) {
         return switch (type) {
-            case Schema.Array(Schema.I innerType) -> suffixType(innerType) + "_array";
+            case Schema.Array(Schema.I innerType) -> typeSuffix(innerType) + "_array";
             case Schema.Bit(Number size) -> "bit" + size;
             case Schema.Dict ignored -> "object";
             case Schema.Primitive primitive -> switch (primitive) {
