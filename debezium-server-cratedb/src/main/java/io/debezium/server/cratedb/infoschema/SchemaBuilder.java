@@ -8,8 +8,10 @@ package io.debezium.server.cratedb.infoschema;
 import io.debezium.server.cratedb.schema.Evolution;
 import io.debezium.server.cratedb.schema.Schema;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Use information about schema in CrateDB and create internal representation
@@ -17,6 +19,20 @@ import java.util.List;
  * @author Gabriel Habryn
  */
 public class SchemaBuilder {
+    public final static Map<String, Boolean> knownTypes = new HashMap<String, Boolean>() {{
+        put("smallint", true);
+        put("bigint", true);
+        put("integer", true);
+        put("double precision", true);
+        put("real", true);
+        put("ip", true);
+        put("text", true);
+        put("boolean", true);
+        put("object", true);
+        put("timestamp without time zone", true);
+        put("timestamp with time zone", true);
+    }};
+
     public static Schema.I fromInformationSchema(List<ColumnInfo> columns) {
         LinkedHashMap<Object, Schema.I> fields = new LinkedHashMap<>();
 
@@ -36,13 +52,28 @@ public class SchemaBuilder {
                 }
             }
 
+            // undo suffixType from field name
+            // and check if field without type name exists
+            // if field exists, merge it as Collision type
+            // otherwise treat it as new field
+
             if (fields.containsKey(fieldName)) {
                 var fieldTypePrevious = fields.get(fieldName);
                 var fieldTypeFinal = Evolution.merge(fieldTypePrevious, fieldType);
                 fields.put(fieldName, fieldTypeFinal);
             }
             else {
-                fields.put(fieldName, fieldType);
+                var unsuffixed = Evolution.unsuffiedTypeName(fieldName, fieldType);
+                var unsuffixedFieldName = unsuffixed.getLeft();
+                var unsuffixedFieldType = unsuffixed.getRight();
+                if (fields.containsKey(unsuffixedFieldName)) {
+                    var originalType = fields.get(unsuffixedFieldName);
+                    Schema.I fieldTypeMerged = Evolution.merge(originalType, unsuffixedFieldType);
+                    fields.put(unsuffixedFieldName, fieldTypeMerged);
+                }
+                else {
+                    fields.put(fieldName, fieldType);
+                }
             }
         }
 

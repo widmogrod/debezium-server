@@ -5,16 +5,9 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-
 import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.*;
 
 /**
  * Implementation of the schema evolution for CrateDB
@@ -149,7 +142,7 @@ public class Evolution {
         return fieldName;
     }
 
-    public static Object  sanitizeData(Schema.I schema, Object data) {
+    public static Object sanitizeData(Schema.I schema, Object data) {
         // looks for patterns such as
         // - poly array: stored in object ignore, need to wrap type into {"__malformed": <original value>}
         // - empty array: filter out
@@ -157,7 +150,7 @@ public class Evolution {
 
         return switch (schema) {
             case Schema.Dict(Map<Object, Schema.I> fields) -> switch (data) {
-                case Map map ->  {
+                case Map map -> {
                     var result = new LinkedHashMap<>();
                     for (Map.Entry<Object, Schema.I> entry : fields.entrySet()) {
                         if (entry instanceof List<?> list && list.isEmpty()) {
@@ -274,6 +267,42 @@ public class Evolution {
                 case NULL -> "null";
             };
             case Schema.Coli ignored -> "collision";
+        };
+    }
+
+    public static Pair<String, Schema.I> unsuffiedTypeName(String fieldName, Schema.I schema) {
+        if (!fieldName.contains("_")) {
+            return Pair.of(fieldName, schema);
+        }
+
+        var lastIndex = fieldName.lastIndexOf("_");
+        var lastPart = fieldName.substring(lastIndex+1);
+        var reminder = fieldName.substring(0, lastIndex);
+        return switch (lastPart) {
+            case "array" -> {
+                var result = unsuffiedTypeName(reminder, schema);
+                yield Pair.of(result.getLeft(), Schema.Array.of(result.getRight()));
+            }
+
+            case "int" -> Pair.of(reminder, Schema.Primitive.BIGINT);
+            case "double" -> Pair.of(reminder, Schema.Primitive.DOUBLE);
+            case "bool" -> Pair.of(reminder, Schema.Primitive.BOOLEAN);
+            case "text" -> Pair.of(reminder, Schema.Primitive.TEXT);
+            case "tz" -> Pair.of(reminder, Schema.Primitive.TIMETZ);
+            case "null" -> Pair.of(reminder, Schema.Primitive.NULL);
+            case "object" -> Pair.of(reminder, Schema.Dict.of());
+            case "collision" -> Pair.of(reminder, Schema.Coli.of());
+            default -> {
+                // if starts with "bit" and rest is parsed to number
+                // then extract number
+                if (lastPart.startsWith("bit") && lastPart.substring(3).matches("\\d+")) {
+                    int length = Integer.parseInt(lastPart.substring(3));
+                    yield Pair.of(reminder, Schema.Bit.of(length));
+                }
+                else {
+                    yield Pair.of(fieldName, schema);
+                }
+            }
         };
     }
 
