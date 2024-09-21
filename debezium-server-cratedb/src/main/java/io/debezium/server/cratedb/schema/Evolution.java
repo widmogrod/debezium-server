@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -129,6 +131,39 @@ public class Evolution {
         return fieldName;
     }
 
+    public static Object  sanitizeData(Schema.I schema, Object data) {
+        // looks for patterns such as
+        // - poly array: stored in object ignore, need to wrap type into {"__malformed": <original value>}
+        // - empty array: filter out
+        // - empty fields: filter out
+
+        return switch (schema) {
+            case Schema.Dict(Map<Object, Schema.I> fields) -> switch (data) {
+                case Map map ->  {
+                    var result = new LinkedHashMap<>();
+                    for (Map.Entry<Object, Schema.I> entry : fields.entrySet()) {
+                        if (entry instanceof List<?> list && list.isEmpty()) {
+                            continue;
+                        }
+
+                        result.put(entry.getKey(), normaliseFieldName(map.get(entry.getKey())));
+                    }
+
+                    yield result;
+                }
+                default -> data;
+            };
+            case Schema.Array(Schema.I innerType) -> switch (innerType) {
+                case Schema.Coli ignored -> Map.of("__malformed", data);
+                case Schema.Primitive.NULL -> null;
+                default -> List.of(sanitizeData(innerType, data));
+            };
+            case Schema.Coli ignored -> Map.of("__malformed", data);
+            case Schema.Primitive.NULL -> null;
+            default -> data;
+        };
+    }
+
     public static Object typeSuffix(Object fieldName, Schema.I resultSchema, Schema.I detectedType) {
         if (resultSchema != detectedType) {
             if (resultSchema instanceof Schema.Coli coli) {
@@ -183,8 +218,8 @@ public class Evolution {
                 }
 
                 default -> throw new IllegalArgumentException(
-                        "Cannot merge pair (%s, %s of %s)"
-                                .formatted(a.getClass(), b.getClass(), b)
+                        "Cannot merge pair (%s, %s as %s) \n%s\n%s\n"
+                                .formatted(a.getClass(), b.getClass(), b, a, b)
                 );
             };
 
