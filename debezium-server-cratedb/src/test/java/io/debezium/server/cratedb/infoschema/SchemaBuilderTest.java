@@ -23,6 +23,7 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.Assert.assertEquals;
@@ -52,7 +53,7 @@ class SchemaBuilderTest {
     @Test
     void testFromInformationSchemaWithEmptyColumnsList() {
         List<ColumnInfo> columns = new ArrayList<>();
-        Schema.I result =  SchemaBuilder.fromInformationSchema(columns);
+        Schema.I result = SchemaBuilder.fromInformationSchema(columns);
         assertThat(result).isEqualTo(Schema.Dict.of());
     }
 
@@ -102,6 +103,12 @@ class SchemaBuilderTest {
 
     @Test
     void withGenerated() {
+        DataGen.setSeed(123456789);
+        // set randomness seed
+        Random rand = new Random();
+        rand.setSeed(123456789);
+        // print it
+
         assertDoesNotThrow(() -> {
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("DROP TABLE IF EXISTS test");
@@ -115,8 +122,13 @@ class SchemaBuilderTest {
                 LOGGER.info("info1:{}", info);
             }
 
-            var manager1 = SchemaBuilder.fromInformationSchema(infos1);
-            LOGGER.info("manager1:{}", manager1);
+            var manager0 = SchemaBuilder.fromInformationSchema(infos1);
+            LOGGER.info("manager1:{}", manager0);
+
+            var inner = Evolution.fromPath(List.of("doc"), manager0);
+            assertThat(inner.isEmpty()).isFalse();
+
+            var manager1 = inner.get();
 
             ObjectMapper mapper = new ObjectMapper();
             List<Object> generated = new ArrayList<>();
@@ -126,12 +138,16 @@ class SchemaBuilderTest {
                     Object object = DataGen.generateObject();
                     generated.add(object);
 
-                    LOGGER.error("BEFORE obj: {}", object);
+                    LOGGER.error("BEFORE object0: {}", object);
                     LOGGER.info("BEFORE manager1:{}", manager1);
 
                     var result1 = Evolution.fromObject(manager1, object);
                     var schema1 = result1.getLeft();
                     var object1 = result1.getRight();
+                    LOGGER.info("BEFORE schema1:{}", schema1);
+                    LOGGER.error("BEFORE object1: {}", object1);
+//                    var object2 = Evolution.sanitizeData(schema1, object1);
+//                    LOGGER.error("BEFORE object2: {}", object2);
                     var alters = CrateSQL.toSQL("test", manager1, schema1);
 
                     manager1 = schema1;
@@ -185,8 +201,16 @@ class SchemaBuilderTest {
             }
 
             var manager2 = SchemaBuilder.fromInformationSchema(infos2);
+            var result = Evolution.fromPath(List.of("doc"), manager2);
+            assertThat(result.isEmpty()).isFalse();
+            var manager3 = result.get();
 
-            assertThat(manager1).isEqualTo(manager2);
+            LOGGER.info("manager0={}", manager0);
+            LOGGER.info("manager1={}", manager1);
+            LOGGER.info("manager2={}", manager2);
+            LOGGER.info("manager3={}", manager3);
+
+            assertThat(manager1).isEqualTo(manager3);
         });
     }
 }

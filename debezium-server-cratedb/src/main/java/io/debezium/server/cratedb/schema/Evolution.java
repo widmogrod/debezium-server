@@ -235,4 +235,36 @@ public class Evolution {
             default -> throw new IllegalArgumentException("Unknown type: " + fieldValue.getClass());
         };
     }
+
+    /**
+     * Return schema under a path or none
+     */
+    public static Optional<Schema.I> fromPath(List<String> path, Schema.I schema) {
+        if (path.isEmpty()) {
+            return Optional.of(schema);
+        }
+
+        return switch (schema) {
+            case Schema.Dict(Map<Object, Schema.I> fields) -> {
+                var fieldName = path.get(0);
+                if (fields.containsKey(fieldName)) {
+                    var fieldValue = fields.get(fieldName);
+                    var remainingPath = path.subList(1, path.size());
+                    yield fromPath(remainingPath, fieldValue);
+                }
+
+                yield Optional.empty();
+            }
+
+            case Schema.Array(Schema.I innerType) -> {
+                var fieldName = path.get(0);
+                if (Objects.equals(fieldName, "*")) {
+                    yield fromPath(path.subList(1, path.size()), innerType);
+                }
+
+                yield Optional.empty();
+            }
+            default -> Optional.empty();
+        };
+    }
 }
