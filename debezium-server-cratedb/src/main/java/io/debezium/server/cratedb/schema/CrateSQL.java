@@ -116,6 +116,7 @@ public class CrateSQL {
                 case BOOLEAN -> "BOOLEAN";
                 case TEXT -> "TEXT";
                 case TIMETZ -> "TIMETZ";
+                case NULL -> "NULL";
             };
         };
     }

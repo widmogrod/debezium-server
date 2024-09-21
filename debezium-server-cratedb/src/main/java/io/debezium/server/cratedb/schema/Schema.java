@@ -26,7 +26,8 @@ public record Schema() {
         DOUBLE,
         BOOLEAN,
         TEXT,
-        TIMETZ
+        TIMETZ,
+        NULL
     }
 
     public record Array(I innerType) implements I {

@@ -60,59 +60,56 @@ public class Evolution {
                 default -> Pair.of(merge(schema, detectType(object)), object);
             };
 
-            case Map x -> {
-                if (!(schema instanceof Schema.Dict)) {
-                    throw new IllegalArgumentException();
-                }
+            case Map x -> switch (schema) {
+                case Schema.Dict schema1 -> {
+                    var object2 = new LinkedHashMap<>();
+                    // immutability wrap:
+                    Map<Object, Schema.I> fields = new HashMap<>(schema1.fields());
 
-                var schema1 = (Schema.Dict) schema;
+                    for (var fieldName : x.keySet()) {
+                        var fieldValue = x.get(fieldName);
+                        fieldName = normaliseFieldName(fieldName);
+                        // find if fieldName exists in schema fields
+                        if (fields.containsKey(fieldName)) {
+                            var existingType = fields.get(fieldName);
 
-                var object2 = new LinkedHashMap<>();
-                // immutability wrap:
-                Map<Object, Schema.I> fields = new HashMap<>(schema1.fields());
+                            // detect field type, and add collision type
+                            var detectedType = detectType(fieldValue);
 
-                for (var fieldName : x.keySet()) {
-                    var fieldValue = x.get(fieldName);
-                    fieldName = normaliseFieldName(fieldName);
-                    // find if fieldName exists in schema fields
-                    if (fields.containsKey(fieldName)) {
-                        var existingType = fields.get(fieldName);
+                            var resultPair = fromObject(existingType, fieldValue);
+                            var resultSchema = resultPair.getLeft();
+                            var resultObject = resultPair.getRight();
 
-                        // detect field type, and add collision type
-                        var detectedType = detectType(fieldValue);
+                            var finalType = merge(existingType, resultSchema);
+                            fields.put(fieldName, finalType);
 
-                        var resultPair = fromObject(existingType, fieldValue);
-                        var resultSchema = resultPair.getLeft();
-                        var resultObject = resultPair.getRight();
+                            var finalFieldName = typeSuffix(fieldName, finalType, detectedType);
 
-                        var finalType = merge(existingType, resultSchema);
-                        fields.put(fieldName, finalType);
+                            // add field and value to return object
+                            // under normalized field name
+                            object2.put(finalFieldName, resultObject);
+                        }
+                        else {
+                            // schema don't have field yet
+                            // detect field type, and add collision type
+                            var detectedType = detectType(fieldValue);
 
-                        var finalFieldName = typeSuffix(fieldName, finalType, detectedType);
+                            var resultPair = fromObject(detectedType, fieldValue);
+                            var resultSchema = resultPair.getLeft();
+                            var resultObject = resultPair.getRight();
 
-                        // add field and value to return object
-                        // under normalized field name
-                        object2.put(finalFieldName, resultObject);
+                            fields.put(fieldName, resultSchema);
+
+                            // and field and value to return object
+                            // under normalized field name
+                            object2.put(fieldName, resultObject);
+                        }
                     }
-                    else {
-                        // schema don't have field yet
-                        // detect field type, and add collision type
-                        var detectedType = detectType(fieldValue);
 
-                        var resultPair = fromObject(detectedType, fieldValue);
-                        var resultSchema = resultPair.getLeft();
-                        var resultObject = resultPair.getRight();
-
-                        fields.put(fieldName, resultSchema);
-
-                        // and field and value to return object
-                        // under normalized field name
-                        object2.put(fieldName, resultObject);
-                    }
+                    yield Pair.of(Schema.Dict.of(fields), object2);
                 }
-
-                yield Pair.of(Schema.Dict.of(fields), object2);
-            }
+                default -> Pair.of(merge(schema, detectType(object)), object);
+            };
 
             default -> throw new IllegalArgumentException(
                     "Unknown object match (%s, %s)"
@@ -125,6 +122,7 @@ public class Evolution {
             return str.
                     replaceAll("\\[", "bkt_").
                     replaceAll("\\]", "_bkt").
+                    replaceAll(";", "_semicolon_").
                     replaceAll("\\.", "_dot_");
         }
 
@@ -185,8 +183,8 @@ public class Evolution {
                 }
 
                 default -> throw new IllegalArgumentException(
-                        "Cannot merge pair (%s, %s)"
-                                .formatted(a.getClass(), b.getClass())
+                        "Cannot merge pair (%s, %s of %s)"
+                                .formatted(a.getClass(), b.getClass(), b)
                 );
             };
 
@@ -220,6 +218,7 @@ public class Evolution {
                 case BOOLEAN -> "bool";
                 case TEXT -> "text";
                 case TIMETZ -> "tz";
+                case NULL -> "null";
             };
             case Schema.Coli ignored -> "collision";
         };
@@ -231,7 +230,7 @@ public class Evolution {
             case Integer ignored -> Schema.Primitive.BIGINT;
             case Double ignored -> Schema.Primitive.DOUBLE;
             case Boolean ignored -> Schema.Primitive.BOOLEAN;
-            case List of -> Schema.Array.of(detectType(of.getFirst()));
+            case List of -> Schema.Array.of(of.isEmpty() ? Schema.Primitive.NULL : detectType(of.getFirst()));
             case Map ignored -> Schema.Dict.of();
             default -> throw new IllegalArgumentException("Unknown type: " + fieldValue.getClass());
         };
