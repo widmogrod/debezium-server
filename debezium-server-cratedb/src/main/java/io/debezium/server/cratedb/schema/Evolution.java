@@ -65,7 +65,7 @@ public class Evolution {
                         var fieldValue = x.get(fieldName);
 
                         // empty arrays, or null values
-                        if (shouldShipValue(fieldValue)) {
+                        if (shouldSkipValue(fieldValue)) {
                             continue;
                         }
 
@@ -118,7 +118,7 @@ public class Evolution {
         };
     }
 
-    public static boolean shouldShipValue(Object fieldValue) {
+    public static boolean shouldSkipValue(Object fieldValue) {
         if (fieldValue == null) {
             return true;
         }
@@ -179,10 +179,8 @@ public class Evolution {
         return switch (a) {
             case Schema.Array(Schema.I innerTypeA) -> switch (b) {
                 case Schema.Array(Schema.I innerTypeB) -> Schema.Array.of(merge(innerTypeA, innerTypeB));
-                default -> throw new IllegalArgumentException(
-                        "Cannot merge pair (%s, %s)"
-                                .formatted(a.getClass(), b.getClass())
-                );
+                // FIXES: Cannot merge pair (class io.debezium.server.cratedb.schema.Schema$Array, class io.debezium.server.cratedb.schema.Schema$Primitive)
+                default -> Schema.Coli.of(a, b);
             };
             case Schema.Dict(Map<Object, Schema.I> fieldsA) -> switch (b) {
                 case Schema.Dict(Map<Object, Schema.I> fieldsB) -> {
@@ -204,10 +202,7 @@ public class Evolution {
                     yield Schema.Dict.of(fields);
                 }
 
-                default -> throw new IllegalArgumentException(
-                        "Cannot merge pair (%s, %s as %s) \n%s\n%s\n"
-                                .formatted(a.getClass(), b.getClass(), b, a, b)
-                );
+                default -> Schema.Coli.of(a, b);
             };
 
             case Schema.Coli(Set<Schema.I> setA) -> switch (b) {
@@ -348,5 +343,61 @@ public class Evolution {
             }
             default -> Optional.empty();
         };
+    }
+
+    public static boolean equal(Schema.I a, Schema.I b) {
+        if (a instanceof Schema.Array aArray && b instanceof Schema.Array bArray) {
+            return equal(aArray.innerType(), bArray.innerType());
+        }
+
+        if (a instanceof Schema.Dict aDict && b instanceof Schema.Dict bDict) {
+            var fieldsA = aDict.fields();
+            var fieldsB = bDict.fields();
+
+            if (fieldsA.size() != fieldsB.size()) {
+                return false;
+            }
+
+            for (var fieldA : fieldsA.entrySet()) {
+                var aKey = fieldA.getKey();
+                if (!fieldsB.containsKey(aKey)) {
+                    return false;
+                }
+
+                var aValue = fieldA.getValue();
+                var bValue = fieldsB.get(aKey);
+                if(!equal(aValue, bValue)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if (a instanceof Schema.Coli aColi && b instanceof Schema.Coli bColi) {
+            var aSet = aColi.set();
+            var bSet = bColi.set();
+            if (aSet.size() != bSet.size()) {
+                return false;
+            }
+
+            // check if positional elements are the same type
+            Iterator<Schema.I> aSetIterator = aSet.iterator();
+            Iterator<Schema.I> bSetIterator = bSet.iterator();
+
+            while (aSetIterator.hasNext() && bSetIterator.hasNext()) {
+                Schema.I aElement = aSetIterator.next();
+                Schema.I bElement = bSetIterator.next();
+
+                if (!aElement.equals(bElement)) {
+                    return false;
+                }
+            }
+
+
+            return true;
+        }
+
+        return a.equals(b);
     }
 }
