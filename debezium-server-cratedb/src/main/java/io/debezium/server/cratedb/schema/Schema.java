@@ -17,10 +17,6 @@ public record Schema() {
     public sealed interface I permits Array, Bit, Coli, Dict, Primitive {
     }
 
-    public static I of() {
-        return Dict.of();
-    }
-
     public enum Primitive implements I {
         BIGINT,
         DOUBLE,

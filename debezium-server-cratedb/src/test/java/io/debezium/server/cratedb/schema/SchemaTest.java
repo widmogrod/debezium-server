@@ -5,18 +5,43 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import static io.debezium.server.cratedb.schema.Evolution.fromObject;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 
-import org.junit.jupiter.api.Test;
+import static io.debezium.server.cratedb.schema.Evolution.fromObject;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 class SchemaTest {
     @Test
+    void mixedArrays() {
+        // [[666, 666], [], Queen]
+        var schema0 = Schema.Dict.of();
+        var object0 = Map.of(
+                "name", List.of(List.of(), List.of(666, 666), "Queen")
+        );
+
+        var result = fromObject(schema0, object0);
+        var schema1 = result.getLeft();
+        var object1 = result.getRight();
+
+        assertThat(schema1).isEqualTo(Schema.Dict.of(
+                "name", Schema.Array.of(
+                        Schema.Coli.of(
+                                Schema.Array.of(Schema.Coli.of(Schema.Primitive.BIGINT, Schema.Primitive.NULL)),
+                                Schema.Primitive.TEXT
+                        )
+                )
+        ));
+        assertThat(object1).isEqualTo(Map.of(
+                "name", List.of(List.of(), List.of(666, 666), "Queen")
+        ));
+    }
+
+    @Test
     void testNormalizationOfFieldNames() {
-        var schema = Schema.of();
+        var schema = Schema.Dict.of();
         var object01 = Map.of(
                 "name.", 1,
                 "name[]", 2,
@@ -39,7 +64,7 @@ class SchemaTest {
 
     @Test
     void testFirstTransformation() {
-        var schema = Schema.of();
+        var schema = Schema.Dict.of();
         var object01 = Map.of(
                 "name", "hello",
                 "age", 1,
