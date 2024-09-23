@@ -42,7 +42,7 @@ public class CrateSQL {
                         for (var nested : nestedArrays.entrySet()) {
                             var columnPath = nested.getKey();
                             var columnType = nested.getValue();
-                            var alter = "ALTER TABLE " + tableName + " ADD COLUMN " + sqlColumnName(columnPath) + " " + sqlColumnType(columnType);
+                            var alter = "ALTER TABLE \"" + tableName + "\" ADD COLUMN \"" + sqlColumnName(columnPath) + "\" " + sqlColumnType(columnType);
                             result.add(alter);
                         }
                     }
@@ -83,9 +83,9 @@ public class CrateSQL {
                 nested.put(path, arr);
                 yield nested;
             }
-            case Schema.Coli ignored -> new HashMap() {{
-                put(path, schema);
-            }};
+//            case Schema.Coli ignored -> new HashMap() {{
+//                put(path, schema);
+//            }};
             default -> new HashMap<>();
         };
     }

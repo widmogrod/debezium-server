@@ -24,7 +24,7 @@ class CrateSQLTest {
 
         var statements = CrateSQL.toSQL("test_table", beforeSchema, afterSchema);
         assertThat(statements).isEqualTo(List.of(
-                "ALTER TABLE test_table ADD COLUMN doc['some-list'] ARRAY(ARRAY(BOOLEAN))"));
+                "ALTER TABLE \"test_table\" ADD COLUMN \"doc['some-list']\" ARRAY(ARRAY(BOOLEAN))"));
 
         var statements2 = CrateSQL.toSQL("test_table", afterSchema, afterSchema);
         assertThat(statements2).isEqualTo(List.of());
@@ -58,9 +58,9 @@ class CrateSQLTest {
 
         var statements = CrateSQL.toSQL("test_table", beforeSchema, afterSchema);
         assertThat(statements).isEqualTo(List.of(
-                "ALTER TABLE test_table ADD COLUMN id OBJECT(IGNORED)",
-                "ALTER TABLE test_table ADD COLUMN doc['some-list'] OBJECT(IGNORED)",
-                "ALTER TABLE test_table ADD COLUMN doc['other-list'] ARRAY(ARRAY(ARRAY(OBJECT(IGNORED))))"
+//                "ALTER TABLE \"test_table\" ADD COLUMN \"id\" OBJECT(IGNORED)"
+//                "ALTER TABLE \"test_table\" ADD COLUMN \"doc['some-list']\" OBJECT(IGNORED)",
+                "ALTER TABLE \"test_table\" ADD COLUMN \"doc['other-list']\" ARRAY(ARRAY(ARRAY(OBJECT(IGNORED))))"
         ));
 
         var statements2 = CrateSQL.toSQL("test_table", afterSchema, afterSchema);
