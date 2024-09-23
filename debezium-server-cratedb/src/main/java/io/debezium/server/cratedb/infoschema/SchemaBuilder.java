@@ -8,10 +8,12 @@ package io.debezium.server.cratedb.infoschema;
 import io.debezium.server.cratedb.schema.Evolution;
 import io.debezium.server.cratedb.schema.Schema;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Use information about schema in CrateDB and create internal representation
@@ -39,22 +41,57 @@ public class SchemaBuilder {
         for (ColumnInfo column : columns) {
             var fieldName = column.columnName();
             var fieldType = getColumnType(column);
-
             var details = column.columnDetails();
+
             if (details != null) {
                 if (!details.path().isEmpty()) {
                     // traverse list in reverse order
-                    var list = details.path();
+                    var list = new ArrayList<String>() {{
+                        add(details.name());
+                        addAll(details.path());
+                    }};
+
                     for (var i = list.size() - 1; i >= 0; i--) {
-                        fieldType = Schema.Dict.of(list.get(i), fieldType);
+                        var fieldName2 = list.get(i);
+                        var subPath = list.stream().limit(i + 1).toList();
+                        // prepend subPath with detail.name()
+                        var element = Evolution.fromPath(subPath, Schema.Dict.of(fields));
+                        if (!element.isEmpty()) {
+                            fieldType = Evolution.merge(element.get(), Schema.Dict.of(fieldName2, fieldType));
+                        }
+                        else {
+                            // check unsuffixed name
+                            var unsuffixed = Evolution.unsuffiedTypeName(fieldName2, fieldType);
+                            var unsuffixedFieldName = unsuffixed.getLeft();
+                            var unsuffixedFieldType = unsuffixed.getRight();
+
+                            var unsuffixedSubPath = list.stream().limit(i).collect(Collectors.toCollection(ArrayList::new));
+                            unsuffixedSubPath.add(unsuffixedFieldName);
+                            var unsuffixedElemenat = Evolution.fromPath(unsuffixedSubPath, Schema.Dict.of(fields));
+                            if (!unsuffixedElemenat.isEmpty()) {
+                                var originalType = unsuffixedElemenat.get();
+
+                                if (!Evolution.equal(originalType, unsuffixedFieldType)) {
+                                    var fieldTypeMerged = Evolution.merge(originalType, unsuffixedFieldType);
+                                    fieldType = Schema.Dict.of(unsuffixedFieldName, fieldTypeMerged);
+                                }
+                                else {
+                                    fieldType = Schema.Dict.of(fieldName2, fieldType);
+                                }
+                            }
+                            else {
+                                fieldType = Schema.Dict.of(fieldName2, fieldType);
+                            }
+                        }
                     }
                     fieldName = details.name();
+                    fieldType = Evolution.fromPath(List.of(details.name()), fieldType).get();
                 }
             }
 
             // undo suffixType from field name
             // and check if field without type name exists
-            // if field exists, merge it as Collision type
+            // if field exists, and has different type merge it as Collision type
             // otherwise treat it as new field
 
             if (fields.containsKey(fieldName)) {
@@ -68,8 +105,15 @@ public class SchemaBuilder {
                 var unsuffixedFieldType = unsuffixed.getRight();
                 if (fields.containsKey(unsuffixedFieldName)) {
                     var originalType = fields.get(unsuffixedFieldName);
-                    Schema.I fieldTypeMerged = Evolution.merge(originalType, unsuffixedFieldType);
-                    fields.put(unsuffixedFieldName, fieldTypeMerged);
+
+                    if (!Evolution.equal(originalType, unsuffixedFieldType)) {
+                        // accidental type naming
+                        var fieldTypeMerged = Evolution.merge(originalType, unsuffixedFieldType);
+                        fields.put(unsuffixedFieldName, fieldTypeMerged);
+                    }
+                    else {
+                        fields.put(fieldName, fieldType);
+                    }
                 }
                 else {
                     fields.put(fieldName, fieldType);
