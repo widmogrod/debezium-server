@@ -48,6 +48,27 @@ class SchemaBuilderTest {
     }
 
     @Test
+    void testTwoDifferentFieldNoCompactionShouldOccurInNested() {
+        ColumnInfo.Builder builder = new ColumnInfo.Builder();
+        ColumnInfo column1 = builder.setColumnName("doc['other']['id']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id"))).setDataType("integer").build();
+        ColumnInfo column2 = builder.setColumnName("doc['other']['id_int']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_int"))).setDataType("integer").build();
+//        ColumnInfo column3 = builder.setColumnName("doc['other']['id_text_bool']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_text_bool"))).setDataType("text").build();
+
+        List<ColumnInfo> columns = List.of(column1, column2);
+//        List<ColumnInfo> columns = List.of(column1, column2, column3);
+        Schema.I result = SchemaBuilder.fromInformationSchema(columns);
+        assertThat(result).isEqualTo(Schema.Dict.of(
+                "doc", Schema.Dict.of(
+                        "other", Schema.Dict.of(
+                                "id", Schema.Primitive.BIGINT,
+                                "id_int", Schema.Primitive.BIGINT
+//                                "id_text_bool", Schema.Primitive.TEXT
+                        )
+                )
+        ));
+    }
+
+    @Test
     void testCompactTypeSuffixes() {
         ColumnInfo.Builder builder = new ColumnInfo.Builder();
         ColumnInfo column1 = builder.setColumnName("id").setDataType("integer").build();
@@ -87,6 +108,32 @@ class SchemaBuilderTest {
                         ),
                         "id_int", Schema.Primitive.BIGINT,
                         "id_text_bool", Schema.Primitive.TEXT
+                )
+        ));
+    }
+
+
+    @Test
+    void testCompactTypeSuffixesInNestedDocs2() {
+        ColumnInfo.Builder builder = new ColumnInfo.Builder();
+        ColumnInfo column1 = builder.setColumnName("doc['other']['id']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id"))).setDataType("integer").build();
+        ColumnInfo column2 = builder.setColumnName("doc['other']['id_int']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_int"))).setDataType("integer").build();
+        ColumnInfo column3 = builder.setColumnName("doc['other']['id_bool']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_bool"))).setDataType("boolean").build();
+        ColumnInfo column4 = builder.setColumnName("doc['other']['id_text']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_text"))).setDataType("text").build();
+        ColumnInfo column5 = builder.setColumnName("doc['other']['id_text_bool']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_text_bool"))).setDataType("text").build();
+        List<ColumnInfo> columns = List.of(column1, column2, column3, column4, column5);
+        Schema.I result = SchemaBuilder.fromInformationSchema(columns);
+        assertThat(result).isEqualTo(Schema.Dict.of(
+                "doc", Schema.Dict.of(
+                        "other", Schema.Dict.of(
+                                "id", Schema.Coli.of(
+                                        Schema.Primitive.BIGINT,
+                                        Schema.Primitive.BOOLEAN,
+                                        Schema.Primitive.TEXT
+                                ),
+                                "id_int", Schema.Primitive.BIGINT,
+                                "id_text_bool", Schema.Primitive.TEXT
+                        )
                 )
         ));
     }

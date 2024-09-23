@@ -54,10 +54,17 @@ public class SchemaBuilder {
                     for (var i = list.size() - 1; i >= 0; i--) {
                         var fieldName2 = list.get(i);
                         var subPath = list.stream().limit(i + 1).toList();
+                        if (list.size() - 1 != i) {
+                            fieldType = Schema.Dict.of(fieldName2, fieldType);
+                            continue;
+                        }
+
                         // prepend subPath with detail.name()
                         var element = Evolution.fromPath(subPath, Schema.Dict.of(fields));
                         if (!element.isEmpty()) {
-                            fieldType = Evolution.merge(element.get(), Schema.Dict.of(fieldName2, fieldType));
+                            var fieldTypePrevious = element.get();
+                            fieldType = Schema.Dict.of(fieldName2, fieldType);
+                            fieldType = Evolution.merge(fieldTypePrevious, fieldType);
                         }
                         else {
                             // check unsuffixed name
@@ -67,9 +74,10 @@ public class SchemaBuilder {
 
                             var unsuffixedSubPath = list.stream().limit(i).collect(Collectors.toCollection(ArrayList::new));
                             unsuffixedSubPath.add(unsuffixedFieldName);
-                            var unsuffixedElemenat = Evolution.fromPath(unsuffixedSubPath, Schema.Dict.of(fields));
-                            if (!unsuffixedElemenat.isEmpty()) {
-                                var originalType = unsuffixedElemenat.get();
+
+                            var unsuffixedElement = Evolution.fromPath(unsuffixedSubPath, Schema.Dict.of(fields));
+                            if (!unsuffixedElement.isEmpty()) {
+                                var originalType = unsuffixedElement.get();
 
                                 if (!Evolution.equal(originalType, unsuffixedFieldType)) {
                                     var fieldTypeMerged = Evolution.merge(originalType, unsuffixedFieldType);
