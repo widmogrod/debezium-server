@@ -48,6 +48,25 @@ class SchemaBuilderTest {
     }
 
     @Test
+    void testTwoDifferentFieldNoCompactionShouldOccur2() {
+        ColumnInfo.Builder builder = new ColumnInfo.Builder();
+        ColumnInfo column1 = builder.setColumnName("doc['id']").setColumnDetails(new ColumnDetails("doc", List.of("id"))).setDataType("object").build();
+        ColumnInfo column2 = builder.setColumnName("doc['id_object']").setColumnDetails(new ColumnDetails("doc", List.of("id_object"))).setDataType("bigint").build();
+        ColumnInfo column3 = builder.setColumnName("doc['id_object_text']").setColumnDetails(new ColumnDetails("doc", List.of("id_object_text"))).setDataType("text").build();
+        List<ColumnInfo> columns = List.of(column1, column2, column3);
+        Schema.I result = SchemaBuilder.fromInformationSchema(columns);
+        assertThat(result).isEqualTo(Schema.Dict.of(
+                "doc", Schema.Dict.of(
+                        "id", Schema.Dict.of(),
+                        "id_object", Schema.Coli.of(
+                                Schema.Primitive.BIGINT,
+                                Schema.Primitive.TEXT
+                        )
+                )
+        ));
+    }
+
+    @Test
     void testTwoDifferentFieldNoCompactionShouldOccurInNested() {
         ColumnInfo.Builder builder = new ColumnInfo.Builder();
         ColumnInfo column1 = builder.setColumnName("doc['other']['id']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id"))).setDataType("integer").build();
