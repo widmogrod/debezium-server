@@ -75,11 +75,18 @@ public class SchemaBuilder {
                             var unsuffixedSubPath = list.stream().limit(i).collect(Collectors.toCollection(ArrayList::new));
                             unsuffixedSubPath.add(unsuffixedFieldName);
 
+                            if (!Evolution.equal(fieldType, unsuffixedFieldType)) {
+                                // then this means that this column couldn't be created by schema Evolution
+                                fieldType = Schema.Dict.of(fieldName2, fieldType);
+                                continue;
+                            }
+
                             var unsuffixedElement = Evolution.fromPath(unsuffixedSubPath, Schema.Dict.of(fields));
                             if (!unsuffixedElement.isEmpty()) {
                                 var originalType = unsuffixedElement.get();
 
                                 if (!Evolution.equal(originalType, unsuffixedFieldType)) {
+                                    // then this means that this column couldn't be created by schema Evolution
                                     var fieldTypeMerged = Evolution.merge(originalType, unsuffixedFieldType);
                                     fieldType = Schema.Dict.of(unsuffixedFieldName, fieldTypeMerged);
                                 }
@@ -111,11 +118,16 @@ public class SchemaBuilder {
                 var unsuffixed = Evolution.unsuffiedTypeName(fieldName, fieldType);
                 var unsuffixedFieldName = unsuffixed.getLeft();
                 var unsuffixedFieldType = unsuffixed.getRight();
-                if (fields.containsKey(unsuffixedFieldName)) {
+
+                if (!Evolution.equal(fieldType, unsuffixedFieldType)) {
+                    // then this means that this column couldn't be created by schema Evolution
+                    fields.put(fieldName, fieldType);
+                }
+                else if (fields.containsKey(unsuffixedFieldName)) {
                     var originalType = fields.get(unsuffixedFieldName);
 
                     if (!Evolution.equal(originalType, unsuffixedFieldType)) {
-                        // accidental type naming
+                        // then this means that this column couldn't be created by schema Evolution
                         var fieldTypeMerged = Evolution.merge(originalType, unsuffixedFieldType);
                         fields.put(unsuffixedFieldName, fieldTypeMerged);
                     }
