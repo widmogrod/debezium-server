@@ -8,6 +8,7 @@ package io.debezium.server.cratedb.schema;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
@@ -103,5 +104,65 @@ class EvolutionTest {
         var schema4 = Schema.Coli.of(Schema.Primitive.TEXT, Schema.Primitive.BOOLEAN);
 
         assertThat(Evolution.equal(schema3, schema4)).isTrue();
+    }
+
+    @Test
+    void testTryCast() {
+        var schema1 = Schema.Coli.of(
+                Schema.Primitive.TEXT,
+                Schema.Array.of(Schema.Primitive.BOOLEAN)
+        );
+        var value = List.of(true, Map.of("key", false), 666);
+        var result = Evolution.tryCast(value, schema1);
+        assertThat(result).isEqualTo(PartialValue.of(
+                "[true, {key=false}, 666]",
+                value
+        ));
+    }
+
+    @Test
+    void testSimilar1() {
+        Schema.I schema1 = Schema.Dict.of(
+                "=", Schema.Primitive.DOUBLE,
+                "smallint", Schema.Dict.of(
+                        "lucky", Schema.Primitive.BIGINT,
+                        "truth", Schema.Primitive.BOOLEAN
+                ),
+                "name_@", Schema.Dict.of(
+                        "lucky", Schema.Primitive.BIGINT,
+                        "truth", Schema.Primitive.BOOLEAN
+                ),
+                "name", Schema.Coli.of(
+                        Schema.Primitive.TEXT,
+                        Schema.Array.of(Schema.Primitive.BOOLEAN)
+                ),
+                "name_timestamp without time zone", Schema.Dict.of(
+                        "lucky", Schema.Primitive.BIGINT,
+                        "truth", Schema.Primitive.BOOLEAN
+                ),
+                ">=", Schema.Primitive.DOUBLE,
+                "?", Schema.Primitive.DOUBLE
+        );
+
+        Schema.I schema2 = Schema.Dict.of(
+                "=", Schema.Primitive.DOUBLE,
+                "smallint", Schema.Dict.of(
+                        "lucky", Schema.Primitive.BIGINT,
+                        "truth", Schema.Primitive.BOOLEAN
+                ),
+                "name_@", Schema.Dict.of(
+                        "lucky", Schema.Primitive.BIGINT,
+                        "truth", Schema.Primitive.BOOLEAN
+                ),
+                "name", Schema.Primitive.TEXT,
+                "name_timestamp without time zone", Schema.Dict.of(
+                        "lucky", Schema.Primitive.BIGINT,
+                        "truth", Schema.Primitive.BOOLEAN
+                ),
+                ">=", Schema.Primitive.DOUBLE,
+                "?", Schema.Primitive.DOUBLE
+        );
+
+        assertThat(Evolution.similar(schema1, schema2)).isTrue();
     }
 }

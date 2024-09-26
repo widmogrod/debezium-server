@@ -16,28 +16,53 @@ import java.util.*;
  */
 public class Evolution {
     public static Pair<Schema.I, Object> fromObject(Schema.I schema, Object object) {
+        if (object instanceof PartialValue partialValue) {
+            return fromObject(schema, partialValue.normalised());
+        }
+
         return switch (object) {
             case Integer ignored -> switch (schema) {
                 case Schema.Primitive.BIGINT -> Pair.of(schema, object);
-                default -> Pair.of(merge(schema, detectType(object)), object);
+                default -> {
+                    var finalSchema = merge(schema, detectType(object));
+                    var finalValue = tryCast(object, finalSchema);
+                    yield Pair.of(finalSchema, finalValue);
+                }
             };
             case Double ignored -> switch (schema) {
                 case Schema.Primitive.DOUBLE -> Pair.of(schema, object);
-                default -> Pair.of(merge(schema, detectType(object)), object);
+                default -> {
+                    var finalSchema = merge(schema, detectType(object));
+                    var finalValue = tryCast(object, finalSchema);
+                    yield Pair.of(finalSchema, finalValue);
+                }
             };
             case String ignored -> switch (schema) {
                 case Schema.Primitive.TEXT -> Pair.of(schema, object);
-                default -> Pair.of(merge(schema, detectType(object)), object);
+                default -> {
+                    var finalSchema = merge(schema, detectType(object));
+                    var finalValue = tryCast(object, finalSchema);
+                    yield Pair.of(finalSchema, finalValue);
+                }
             };
             case Boolean ignored -> switch (schema) {
                 case Schema.Primitive.BOOLEAN -> Pair.of(schema, object);
-                default -> Pair.of(merge(schema, detectType(object)), object);
+                default -> {
+                    var finalSchema = merge(schema, detectType(object));
+                    var finalValue = tryCast(object, finalSchema);
+                    yield Pair.of(finalSchema, finalValue);
+                }
             };
 
             case List list -> switch (schema) {
                 case Schema.Array schemaList -> {
+                    if (list.isEmpty()) {
+                        yield Pair.of(schemaList, PartialValue.of(null, list));
+                    }
+
                     var result = new ArrayList<>();
-                    var innerType = schemaList.innerType();
+                    var originalType = schemaList.innerType();
+                    var innerType = originalType;
                     for (var item : list) {
                         var resultPair = fromObject(innerType, item);
                         var resultSchema = resultPair.getLeft();
@@ -50,9 +75,26 @@ public class Evolution {
                         result.add(resultObject);
                     }
 
-                    yield Pair.of(Schema.Array.of(innerType), result);
+                    // if inner type is collision
+                    // it's hard to represent such types in cratedb
+                    // let's just make result array empty
+                    // there is no ARRAY(IGNORED) type that would help to put into array elements of different types
+                    // and when all elements of whole array are not of the type of first colliding type
+                    // or if they cannot be casted to given type, then whole array should be removed
+                    // or create Partial object, that will hold original data, transformed, giving some level of control
+                    // to parent process to control what to do with partial objects
+                    // partial object could hold casted values also
+
+                    var finalType = Schema.Array.of(innerType);
+                    var finalResult = tryCast(result, finalType);
+
+                    yield Pair.of(finalType, finalResult);
                 }
-                default -> Pair.of(merge(schema, detectType(object)), object);
+                default -> {
+                    var finalSchema = merge(schema, detectType(object));
+                    var finalValue = tryCast(object, finalSchema);
+                    yield Pair.of(finalSchema, finalValue);
+                }
             };
 
             case Map x -> switch (schema) {
@@ -74,9 +116,6 @@ public class Evolution {
                         if (fields.containsKey(fieldName)) {
                             var existingType = fields.get(fieldName);
 
-                            // detect field type, and add collision type
-                            var detectedType = detectType(fieldValue);
-
                             var resultPair = fromObject(existingType, fieldValue);
                             var resultSchema = resultPair.getLeft();
                             var resultObject = resultPair.getRight();
@@ -84,11 +123,9 @@ public class Evolution {
                             var finalType = merge(existingType, resultSchema);
                             fields.put(fieldName, finalType);
 
-                            var finalFieldName = typeSuffix(fieldName, finalType, detectedType);
-
                             // add field and value to return object
                             // under normalized field name
-                            object2.put(finalFieldName, resultObject);
+                            object2.put(fieldName, resultObject);
                         }
                         else {
                             // schema don't have field yet
@@ -109,12 +146,108 @@ public class Evolution {
 
                     yield Pair.of(Schema.Dict.of(fields), object2);
                 }
-                default -> Pair.of(merge(schema, detectType(object)), object);
+                default -> {
+                    var finalSchema = merge(schema, detectType(object));
+                    var finalValue = tryCast(object, finalSchema);
+                    yield Pair.of(finalSchema, finalValue);
+                }
             };
 
             default -> throw new IllegalArgumentException(
                     "Unknown object match (%s, %s)"
                             .formatted(schema.getClass(), object.getClass()));
+        };
+    }
+
+    public static Object tryCast(Object value, Schema.I type) {
+        if (value instanceof PartialValue partialValue) {
+            return tryCast(partialValue.original(), type);
+        }
+
+        return switch (type) {
+            case Schema.Primitive primitive -> switch (primitive) {
+                case Schema.Primitive.BIGINT -> {
+                    try {
+                        yield Integer.parseInt(value.toString());
+                    }
+                    catch (NumberFormatException e) {
+                        yield PartialValue.of(null, value);
+                    }
+                }
+                case Schema.Primitive.DOUBLE -> {
+                    try {
+                        yield Double.parseDouble(value.toString());
+                    }
+                    catch (NumberFormatException e) {
+                        yield PartialValue.of(null, value);
+                    }
+                }
+                case Schema.Primitive.TEXT -> {
+                    if (value instanceof String) {
+                        yield value.toString();
+                    }
+
+                    yield PartialValue.of(value.toString(), value);
+                }
+                case Schema.Primitive.BOOLEAN -> {
+                    if (value instanceof Boolean bool) {
+                        yield bool;
+                    }
+                    else if (value instanceof String str) {
+                        yield Boolean.parseBoolean(str);
+                    }
+                    yield PartialValue.of(null, value);
+                }
+                case TIMETZ -> {
+                    // FIXME: this should be detection of type
+                    yield value;
+                }
+                case NULL -> {
+                    if (value == null) {
+                        yield null;
+                    }
+
+                    yield PartialValue.of(null, value);
+                }
+            };
+
+            case Schema.Array(Schema.I innerType) -> switch (value) {
+                case List list -> {
+                    var result = new ArrayList<>();
+                    for (var element : list) {
+                        result.add(tryCast(element, innerType));
+                    }
+                    yield result;
+                }
+                default -> PartialValue.of(null, value);
+            };
+            case Schema.Dict(Map<Object, Schema.I> fields) -> switch (value) {
+                case Map map -> {
+                    var result = new LinkedHashMap<>();
+                    for (var fieldName : map.keySet()) {
+                        Object fieldValue = map.get(fieldName);
+
+                        if (fields.containsKey(fieldName)) {
+                            var valueType = fields.get(fieldName);
+                            fieldValue = tryCast(fieldValue, valueType);
+                            if (fieldValue instanceof PartialValue) {
+                                // if value is partial, we could try to add type suffix here!
+                                fieldName = typeSuffix(fieldName, valueType, detectType(fieldValue));
+                            }
+                        }
+
+                        result.put(fieldName, fieldValue);
+                    }
+                    yield result;
+                }
+                default -> PartialValue.of(null, value);
+            };
+            case Schema.Coli(Set<Schema.I> set) -> {
+                var firstType = set.iterator().next();
+                yield tryCast(value, firstType);
+            }
+
+            default -> throw new IllegalArgumentException("Unsupported casting " + type.getClass());
         };
     }
 
@@ -142,44 +275,10 @@ public class Evolution {
         return fieldName;
     }
 
-    public static Object sanitizeData(Schema.I schema, Object data) {
-        // looks for patterns such as
-        // - poly array: stored in object ignore, need to wrap type into {"__malformed": <original value>}
-        // - empty array: filter out
-        // - empty fields: filter out
-
-        return switch (schema) {
-            case Schema.Dict(Map<Object, Schema.I> fields) -> switch (data) {
-                case Map map -> {
-                    var result = new LinkedHashMap<>();
-                    for (Map.Entry<Object, Schema.I> entry : fields.entrySet()) {
-                        if (entry instanceof List<?> list && list.isEmpty()) {
-                            continue;
-                        }
-
-                        result.put(entry.getKey(), normaliseFieldName(map.get(entry.getKey())));
-                    }
-
-                    yield result;
-                }
-                default -> data;
-            };
-            case Schema.Array(Schema.I innerType) -> switch (innerType) {
-                case Schema.Coli ignored -> Map.of("__malformed", data);
-                case Schema.Primitive.NULL -> null;
-                default -> List.of(sanitizeData(innerType, data));
-            };
-            case Schema.Coli ignored -> Map.of("__malformed", data);
-            case Schema.Primitive.NULL -> null;
-            default -> data;
-        };
-    }
-
     public static Schema.I merge(Schema.I a, Schema.I b) {
         return switch (a) {
             case Schema.Array(Schema.I innerTypeA) -> switch (b) {
                 case Schema.Array(Schema.I innerTypeB) -> Schema.Array.of(merge(innerTypeA, innerTypeB));
-                // FIXES: Cannot merge pair (class io.debezium.server.cratedb.schema.Schema$Array, class io.debezium.server.cratedb.schema.Schema$Primitive)
                 default -> Schema.Coli.of(a, b);
             };
             case Schema.Dict(Map<Object, Schema.I> fieldsA) -> switch (b) {
@@ -271,7 +370,7 @@ public class Evolution {
         }
 
         var lastIndex = fieldName.lastIndexOf("_");
-        var lastPart = fieldName.substring(lastIndex+1);
+        var lastPart = fieldName.substring(lastIndex + 1);
         var reminder = fieldName.substring(0, lastIndex);
         return switch (lastPart) {
             case "array" -> {
@@ -309,6 +408,7 @@ public class Evolution {
             case Boolean ignored -> Schema.Primitive.BOOLEAN;
             case List of -> Schema.Array.of(of.isEmpty() ? Schema.Primitive.NULL : detectType(of.getFirst()));
             case Map ignored -> Schema.Dict.of();
+            case PartialValue(Object ignored, Object original) -> detectType(original);
             default -> throw new IllegalArgumentException("Unknown type: " + fieldValue.getClass());
         };
     }
@@ -366,7 +466,7 @@ public class Evolution {
 
                 var aValue = fieldA.getValue();
                 var bValue = fieldsB.get(aKey);
-                if(!equal(aValue, bValue)) {
+                if (!equal(aValue, bValue)) {
                     return false;
                 }
             }
@@ -396,6 +496,88 @@ public class Evolution {
 
 
             return true;
+        }
+
+        return a.equals(b);
+    }
+
+    public static boolean similar(Schema.I a, Schema.I b) {
+        // a is reference value build by Evolution, and b can be a value build by inferSchema
+        // b values can have less fields
+        // b values may not have collision types on arrays
+        // but if there is collision in a, b needs to have first element from collision matching
+        if (a instanceof Schema.Array aArray && b instanceof Schema.Array bArray) {
+            return similar(aArray.innerType(), bArray.innerType());
+        }
+
+        if (a instanceof Schema.Dict aDict && b instanceof Schema.Dict bDict) {
+            var fieldsA = aDict.fields();
+            var fieldsB = bDict.fields();
+
+            if (fieldsA.size() < fieldsB.size()) {
+                return false;
+            }
+
+            for (var fieldA : fieldsA.entrySet()) {
+                var aKey = fieldA.getKey();
+                var aValue = fieldA.getValue();
+                if (!fieldsB.containsKey(aKey)) {
+                    // but if aValue is collision, tolerate it
+                    if (aValue instanceof Schema.Coli ||
+                        (aValue instanceof Schema.Array arr && arr.innerType() instanceof Schema.Coli)) {
+                        return true;
+                    }
+                    return false;
+                }
+
+                var bValue = fieldsB.get(aKey);
+                if (!similar(aValue, bValue)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if (a instanceof Schema.Coli aColi && b instanceof Schema.Coli bColi) {
+            var aSet = aColi.set();
+            var bSet = bColi.set();
+            if (aSet.size() != bSet.size()) {
+                return false;
+            }
+
+            // check if positional elements are the same type
+            Iterator<Schema.I> aSetIterator = aSet.iterator();
+            Iterator<Schema.I> bSetIterator = bSet.iterator();
+
+            while (aSetIterator.hasNext() && bSetIterator.hasNext()) {
+                Schema.I aElement = aSetIterator.next();
+                Schema.I bElement = bSetIterator.next();
+
+                if (!aElement.equals(bElement)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // WEEK: assumption, if first element of collision is the same as the original type then they can be considered similar
+        if (a instanceof Schema.Coli aColi) {
+            var aSet = aColi.set();
+            var aFirst = aSet.iterator().next();
+
+            if (similar(aFirst, b)) {
+                return true;
+            }
+        }
+        else if (b instanceof Schema.Coli bColi) {
+            var bSet = bColi.set();
+            var bFirst = bSet.iterator().next();
+
+            if (similar(a, bFirst)) {
+                return true;
+            }
         }
 
         return a.equals(b);
