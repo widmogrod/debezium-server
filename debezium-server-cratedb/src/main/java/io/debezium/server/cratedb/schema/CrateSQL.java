@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Takes two schemas as input and produce sequence of SQL commands
@@ -23,28 +24,13 @@ public class CrateSQL {
             case Schema.Dict(Map<Object, Schema.I> fieldsBefore) -> switch (afterSchema) {
                 case Schema.Dict(Map<Object, Schema.I> fieldsAfter) -> {
                     var result = new ArrayList<String>();
-                    // if (fieldsBefore.size() == 0) {
-                    // // we have to create table
-                    // var createTable = "CREATE TABLE IF NOT EXISTS" + tableName + " (doc OBJECT(DYNAMIC) WITH (column_policy = 'dynamic')";
-                    // result.add(createTable);
-                    // }
-                    // get fields are new inf after schema
-                    // don't delete fields if they don't exist
-                    for (var after : fieldsAfter.entrySet()) {
-                        var afterField = after.getKey();
-                        if (fieldsBefore.containsKey(afterField)) {
-                            continue;
-                        }
+                    var nestedArrays = extractNestedObjectTypes(List.of(), beforeSchema, afterSchema);
 
-                        var afterValue = after.getValue();
-                        var nestedArrays = extractNestedArrayTypes(List.of(afterField), afterValue);
-
-                        for (var nested : nestedArrays.entrySet()) {
-                            var columnPath = nested.getKey();
-                            var columnType = nested.getValue();
-                            var alter = "ALTER TABLE \"" + tableName + "\" ADD COLUMN \"" + sqlColumnName(columnPath) + "\" " + sqlColumnType(columnType);
-                            result.add(alter);
-                        }
+                    for (var nested : nestedArrays.entrySet()) {
+                        var columnPath = nested.getKey();
+                        var columnType = nested.getValue();
+                        var alter = "ALTER TABLE \"" + tableName + "\" ADD COLUMN \"" + sqlColumnName(columnPath) + "\" " + sqlColumnType(columnType);
+                        result.add(alter);
                     }
 
                     yield result;
@@ -58,6 +44,37 @@ public class CrateSQL {
         };
     }
 
+    private static Map<List<Object>, Schema.I> extractNestedObjectTypes(List<Object> path, Schema.I beforeSchema, Schema.I afterSchema) {
+        return switch (beforeSchema) {
+            case Schema.Dict(Map<Object, Schema.I> fieldsBefore) -> switch (afterSchema) {
+                case Schema.Dict(Map<Object, Schema.I> fieldsAfter) -> {
+                    Map<List<Object>, Schema.I> result = new HashMap<>();
+                    for (var after : fieldsAfter.entrySet()) {
+                        var afterField = after.getKey();
+                        var afterValue = after.getValue();
+
+                        var newPath = new ArrayList<>(path);
+                        // get unique column name instead of field name
+                        newPath.add(afterField);
+
+                        Map<List<Object>, Schema.I> nestedArrays = null;
+                        if (fieldsBefore.containsKey(afterField)) {
+                            var beforeValue = fieldsBefore.get(afterField);
+                            nestedArrays  = extractNestedObjectTypes(newPath, beforeValue, afterValue);
+                        } else {
+                            nestedArrays = extractNestedArrayTypes(newPath, afterValue);
+                        }
+
+                        result.putAll(nestedArrays);
+                    }
+
+                    yield result;
+                }
+                default -> new HashMap<>();
+            };
+            default -> new HashMap<>();
+        };
+    }
 
     public static Map<List<Object>, Schema.I> extractNestedArrayTypes(List<Object> path, Schema.I schema) {
         return switch (schema) {
@@ -83,8 +100,11 @@ public class CrateSQL {
                 nested.put(path, arr);
                 yield nested;
             }
-//            case Schema.Coli ignored -> new HashMap() {{
-//                put(path, schema);
+//            case Schema.Coli(Set<Schema.I> set)  -> new HashMap() {{
+//                var nested = extractNestedArrayTypes(new ArrayList<>(path), set.iterator().next());
+//                nested.putAll(nested);
+//
+//                putAll(nested);
 //            }};
             default -> new HashMap<>();
         };
@@ -105,7 +125,10 @@ public class CrateSQL {
         return switch (columnType) {
             case Schema.Array(Schema.I innerType) -> "ARRAY(" + sqlColumnType(innerType) + ")";
             case Schema.Bit(Number size) -> "BIT(" + size + ")";
-            case Schema.Coli ignored -> "OBJECT(IGNORED)";
+            case Schema.Coli(Set<Schema.I> set) -> {
+                yield sqlColumnType(set.iterator().next());
+                // "OBJECT(IGNORED)";
+            }
             case Schema.Dict ignored -> "OBJECT(DYNAMIC)";
             case Schema.Primitive primitive -> switch (primitive) {
                 case BIGINT -> "BIGINT";
