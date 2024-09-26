@@ -267,42 +267,5 @@ class SchemaBuilderTest {
                 "id", Schema.Primitive.TEXT,
                 "doc", expected
         ));
-
-        Schema.I expected2 = Schema.Dict.of(
-//                "_bkt", Schema.Primitive.DOUBLE,
-//                "!", Schema.Primitive.DOUBLE,
-//                "role", Schema.Primitive.TEXT,
-//                "#", Schema.Primitive.DOUBLE,
-                "name_object", Schema.Coli.of(
-                        Schema.Primitive.BIGINT,
-                        Schema.Primitive.TEXT
-                ),
-//                "geo_shape", Schema.Primitive.BIGINT,
-//                "name_)", Schema.Array.of(
-//                        Schema.Coli.of(Schema.Primitive.BOOLEAN,
-//                                Schema.Array.of(Schema.Primitive.BIGINT),
-//                                Schema.Array.of(Schema.Array.of(Schema.Primitive.TEXT))
-//                        )
-//                ),
-//                "-", Schema.Primitive.DOUBLE,
-//                "timestamp without time zone", Schema.Primitive.BOOLEAN,
-                "name", Schema.Coli.of(
-                        Schema.Dict.of(
-                                "lucky", Schema.Primitive.BIGINT,
-                                "truth", Schema.Primitive.BOOLEAN
-                        ),
-                        Schema.Primitive.BIGINT
-                )
-//                "<", Schema.Primitive.DOUBLE,
-//                "|", Schema.Primitive.DOUBLE,
-//                "?", Schema.Primitive.DOUBLE,
-//                "real", Schema.Array.of(
-//                        Schema.Coli.of(
-//                                Schema.Array.of(Schema.Primitive.NULL),
-//                                Schema.Primitive.BIGINT,
-//                                Schema.Primitive.BOOLEAN
-//                        )
-//                )
-        );
     }
 }
