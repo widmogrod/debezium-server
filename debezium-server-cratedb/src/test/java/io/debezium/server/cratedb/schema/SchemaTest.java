@@ -35,7 +35,11 @@ class SchemaTest {
                 )
         ));
         assertThat(object1).isEqualTo(Map.of(
-                "name", List.of(List.of(), List.of(666, 666), "Queen")
+                "name", List.of(
+                        List.of(),
+                        List.of(PartialValue.of(null, 666), PartialValue.of(null, 666)),
+                        PartialValue.of(null, "Queen")
+                )
         ));
     }
 
@@ -86,7 +90,11 @@ class SchemaTest {
                         "address", List.of(
                                 Map.of("zip-code", "12-345")),
                         "list_of_list", List.of(List.of(false)),
-                        "bag", List.of(1, false, "??", 2, true, "!")));
+                        "bag", List.of(1, PartialValue.of(null, false),
+                                 PartialValue.of(null, "??"), 2,
+                                 PartialValue.of(null, true),
+                                 PartialValue.of(null, "!")))
+        );
         // schema must be immutable
         assertThat(schema).isEqualTo(Schema.Dict.of());
         // new schema must reflect input object structure
@@ -113,15 +121,16 @@ class SchemaTest {
         var object3 = result2.getRight();
 
         // object should be converted
-        assertThat(object3).isEqualTo(
+        assertThat(object3).usingRecursiveComparison().isEqualTo(
                 Map.of(
-                        "name_bool", false,
-                        "age_text", "not available",
+                        "name", PartialValue.of("false", false),
+                        "age", PartialValue.of(null, "not available"),
                         "address", List.of(
-                                Map.of("zip-code_bool_array", List.of(false)),
-                                Map.of("country", "Poland"))
-
-                ));
+                                Map.of("zip-code_bool_array", PartialValue.of("[false]", List.of(false))),
+                                Map.of("country", "Poland")
+                        )
+                )
+        );
         // schema must be immutable
         assertThat(schema1).isEqualTo(
                 Schema.Dict.of(
