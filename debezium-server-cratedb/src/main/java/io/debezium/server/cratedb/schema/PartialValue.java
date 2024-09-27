@@ -5,9 +5,9 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import com.fasterxml.jackson.annotation.JsonValue;
-
 import java.util.Objects;
+
+import com.fasterxml.jackson.annotation.JsonValue;
 
 public record PartialValue(Object normalised, Object original) {
     public static PartialValue of(Object of, Object result) {

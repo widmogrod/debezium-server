@@ -5,9 +5,6 @@
  */
 package io.debezium.server.cratedb.infoschema;
 
-import io.debezium.server.cratedb.schema.Evolution;
-import io.debezium.server.cratedb.schema.Schema;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -15,25 +12,30 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import io.debezium.server.cratedb.schema.Evolution;
+import io.debezium.server.cratedb.schema.Schema;
+
 /**
  * Use information about schema in CrateDB and create internal representation
  *
  * @author Gabriel Habryn
  */
 public class SchemaBuilder {
-    public final static Map<String, Boolean> knownTypes = new HashMap<String, Boolean>() {{
-        put("smallint", true);
-        put("bigint", true);
-        put("integer", true);
-        put("double precision", true);
-        put("real", true);
-        put("ip", true);
-        put("text", true);
-        put("boolean", true);
-        put("object", true);
-        put("timestamp without time zone", true);
-        put("timestamp with time zone", true);
-    }};
+    public final static Map<String, Boolean> knownTypes = new HashMap<String, Boolean>() {
+        {
+            put("smallint", true);
+            put("bigint", true);
+            put("integer", true);
+            put("double precision", true);
+            put("real", true);
+            put("ip", true);
+            put("text", true);
+            put("boolean", true);
+            put("object", true);
+            put("timestamp without time zone", true);
+            put("timestamp with time zone", true);
+        }
+    };
 
     public static Schema.I fromInformationSchema(List<ColumnInfo> columns) {
         LinkedHashMap<Object, Schema.I> fields = new LinkedHashMap<>();
@@ -46,19 +48,21 @@ public class SchemaBuilder {
             if (details != null) {
                 if (!details.path().isEmpty()) {
                     // traverse list in reverse order
-                    var list = new ArrayList<String>() {{
-                        add(details.name());
-                        addAll(details.path());
-                    }};
+                    var list = new ArrayList<String>() {
+                        {
+                            add(details.name());
+                            addAll(details.path());
+                        }
+                    };
 
                     for (var i = list.size() - 1; i >= 0; i--) {
                         var fieldName2 = list.get(i);
                         var subPath = list.stream().limit(i + 1).toList();
                         if (list.size() - 1 != i) {
-//                            // FIX parent object under a path could exists
-//                            //     and it could be Array(OBJECT)
-//                            //     and in cratedb this means we need to concat arrays
-//                            //     this is only valid assumption in context of infer schema
+                            // // FIX parent object under a path could exists
+                            // // and it could be Array(OBJECT)
+                            // // and in cratedb this means we need to concat arrays
+                            // // this is only valid assumption in context of infer schema
                             var element = Evolution.fromPath(subPath, Schema.Dict.of(fields));
                             if (element.isPresent()) {
                                 var el = element.get();

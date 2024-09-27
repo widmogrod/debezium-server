@@ -5,9 +5,9 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import org.apache.commons.lang3.tuple.Pair;
-
 import java.util.*;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Implementation of the schema evolution for CrateDB
@@ -271,11 +271,7 @@ public class Evolution {
 
     public static Object normaliseFieldName(Object fieldName) {
         if (fieldName instanceof String str) {
-            return str.
-                    replaceAll("\\[", "bkt_").
-                    replaceAll("\\]", "_bkt").
-                    replaceAll(";", "_semicolon_").
-                    replaceAll("\\.", "_dot_");
+            return str.replaceAll("\\[", "bkt_").replaceAll("\\]", "_bkt").replaceAll(";", "_semicolon_").replaceAll("\\.", "_dot_");
         }
 
         return fieldName;
@@ -512,7 +508,6 @@ public class Evolution {
                 }
             }
 
-
             return true;
         }
 
@@ -542,7 +537,7 @@ public class Evolution {
                 if (!fieldsB.containsKey(aKey)) {
                     // but if aValue is collision, tolerate it
                     if (aValue instanceof Schema.Coli ||
-                        (aValue instanceof Schema.Array arr && arr.innerType() instanceof Schema.Coli)) {
+                            (aValue instanceof Schema.Array arr && arr.innerType() instanceof Schema.Coli)) {
                         return true;
                     }
                     return false;

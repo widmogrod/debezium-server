@@ -5,13 +5,14 @@
  */
 package io.debezium.server.cratedb.infoschema;
 
-import io.debezium.server.cratedb.schema.Schema;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import org.junit.jupiter.api.Test;
+
+import io.debezium.server.cratedb.schema.Schema;
 
 class SchemaBuilderTest {
     @Test
@@ -28,8 +29,7 @@ class SchemaBuilderTest {
         List<ColumnInfo> columns = List.of(columnInfo);
         Schema.I result = SchemaBuilder.fromInformationSchema(columns);
         assertThat(result).isEqualTo(Schema.Dict.of(
-                "id", Schema.Primitive.BIGINT
-        ));
+                "id", Schema.Primitive.BIGINT));
     }
 
     @Test
@@ -43,8 +43,7 @@ class SchemaBuilderTest {
         assertThat(result).isEqualTo(Schema.Dict.of(
                 "id", Schema.Primitive.BIGINT,
                 "id_int", Schema.Primitive.BIGINT,
-                "id_text_bool", Schema.Primitive.TEXT
-        ));
+                "id_text_bool", Schema.Primitive.TEXT));
     }
 
     @Test
@@ -52,7 +51,8 @@ class SchemaBuilderTest {
         ColumnInfo.Builder builder = new ColumnInfo.Builder();
         ColumnInfo column1 = builder.setColumnName("doc['id']").setColumnDetails(new ColumnDetails("doc", List.of("id"))).setDataType("object").build();
         ColumnInfo column2 = builder.setColumnName("doc['id_object']").setColumnDetails(new ColumnDetails("doc", List.of("id_object"))).setDataType("bigint").build();
-        ColumnInfo column3 = builder.setColumnName("doc['id_object_text']").setColumnDetails(new ColumnDetails("doc", List.of("id_object_text"))).setDataType("text").build();
+        ColumnInfo column3 = builder.setColumnName("doc['id_object_text']").setColumnDetails(new ColumnDetails("doc", List.of("id_object_text"))).setDataType("text")
+                .build();
         List<ColumnInfo> columns = List.of(column1, column2, column3);
         Schema.I result = SchemaBuilder.fromInformationSchema(columns);
         assertThat(result).isEqualTo(Schema.Dict.of(
@@ -60,18 +60,18 @@ class SchemaBuilderTest {
                         "id", Schema.Dict.of(),
                         "id_object", Schema.Coli.of(
                                 Schema.Primitive.BIGINT,
-                                Schema.Primitive.TEXT
-                        )
-                )
-        ));
+                                Schema.Primitive.TEXT))));
     }
 
     @Test
     void testTwoDifferentFieldNoCompactionShouldOccurInNested() {
         ColumnInfo.Builder builder = new ColumnInfo.Builder();
-        ColumnInfo column1 = builder.setColumnName("doc['other']['id']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id"))).setDataType("integer").build();
-        ColumnInfo column2 = builder.setColumnName("doc['other']['id_int']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_int"))).setDataType("integer").build();
-        ColumnInfo column3 = builder.setColumnName("doc['other']['id_text_bool']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_text_bool"))).setDataType("text").build();
+        ColumnInfo column1 = builder.setColumnName("doc['other']['id']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id"))).setDataType("integer")
+                .build();
+        ColumnInfo column2 = builder.setColumnName("doc['other']['id_int']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_int"))).setDataType("integer")
+                .build();
+        ColumnInfo column3 = builder.setColumnName("doc['other']['id_text_bool']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_text_bool")))
+                .setDataType("text").build();
 
         List<ColumnInfo> columns = List.of(column1, column2, column3);
         Schema.I result = SchemaBuilder.fromInformationSchema(columns);
@@ -80,10 +80,7 @@ class SchemaBuilderTest {
                         "other", Schema.Dict.of(
                                 "id", Schema.Primitive.BIGINT,
                                 "id_int", Schema.Primitive.BIGINT,
-                                "id_text_bool", Schema.Primitive.TEXT
-                        )
-                )
-        ));
+                                "id_text_bool", Schema.Primitive.TEXT))));
     }
 
     @Test
@@ -100,11 +97,9 @@ class SchemaBuilderTest {
                 "id", Schema.Coli.of(
                         Schema.Primitive.BIGINT,
                         Schema.Primitive.BOOLEAN,
-                        Schema.Primitive.TEXT
-                ),
+                        Schema.Primitive.TEXT),
                 "id_int", Schema.Primitive.BIGINT,
-                "id_text_bool", Schema.Primitive.TEXT
-        ));
+                "id_text_bool", Schema.Primitive.TEXT));
     }
 
     @Test
@@ -122,23 +117,24 @@ class SchemaBuilderTest {
                         "id", Schema.Coli.of(
                                 Schema.Primitive.BIGINT,
                                 Schema.Primitive.BOOLEAN,
-                                Schema.Primitive.TEXT
-                        ),
+                                Schema.Primitive.TEXT),
                         "id_int", Schema.Primitive.BIGINT,
-                        "id_text_bool", Schema.Primitive.TEXT
-                )
-        ));
+                        "id_text_bool", Schema.Primitive.TEXT)));
     }
-
 
     @Test
     void testCompactTypeSuffixesInNestedDocs2() {
         ColumnInfo.Builder builder = new ColumnInfo.Builder();
-        ColumnInfo column1 = builder.setColumnName("doc['other']['id']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id"))).setDataType("integer").build();
-        ColumnInfo column2 = builder.setColumnName("doc['other']['id_int']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_int"))).setDataType("integer").build();
-        ColumnInfo column3 = builder.setColumnName("doc['other']['id_bool']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_bool"))).setDataType("boolean").build();
-        ColumnInfo column4 = builder.setColumnName("doc['other']['id_text']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_text"))).setDataType("text").build();
-        ColumnInfo column5 = builder.setColumnName("doc['other']['id_text_bool']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_text_bool"))).setDataType("text").build();
+        ColumnInfo column1 = builder.setColumnName("doc['other']['id']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id"))).setDataType("integer")
+                .build();
+        ColumnInfo column2 = builder.setColumnName("doc['other']['id_int']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_int"))).setDataType("integer")
+                .build();
+        ColumnInfo column3 = builder.setColumnName("doc['other']['id_bool']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_bool")))
+                .setDataType("boolean").build();
+        ColumnInfo column4 = builder.setColumnName("doc['other']['id_text']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_text"))).setDataType("text")
+                .build();
+        ColumnInfo column5 = builder.setColumnName("doc['other']['id_text_bool']").setColumnDetails(new ColumnDetails("doc", List.of("other", "id_text_bool")))
+                .setDataType("text").build();
         List<ColumnInfo> columns = List.of(column1, column2, column3, column4, column5);
         Schema.I result = SchemaBuilder.fromInformationSchema(columns);
         assertThat(result).isEqualTo(Schema.Dict.of(
@@ -147,13 +143,9 @@ class SchemaBuilderTest {
                                 "id", Schema.Coli.of(
                                         Schema.Primitive.BIGINT,
                                         Schema.Primitive.BOOLEAN,
-                                        Schema.Primitive.TEXT
-                                ),
+                                        Schema.Primitive.TEXT),
                                 "id_int", Schema.Primitive.BIGINT,
-                                "id_text_bool", Schema.Primitive.TEXT
-                        )
-                )
-        ));
+                                "id_text_bool", Schema.Primitive.TEXT))));
     }
 
     @Test
@@ -180,9 +172,11 @@ class SchemaBuilderTest {
                 .setDataType("object")
                 .setColumnName("doc['name']")
                 .setIsPrimaryKey(false)
-                .setColumnDetails(new ColumnDetails("doc", new ArrayList<String>() {{
-                    add("name");
-                }}))
+                .setColumnDetails(new ColumnDetails("doc", new ArrayList<String>() {
+                    {
+                        add("name");
+                    }
+                }))
                 .setCharacterMaximumLength(0)
                 .build();
 
@@ -190,10 +184,12 @@ class SchemaBuilderTest {
                 .setDataType("bigint")
                 .setColumnName("doc['name']['lucky']")
                 .setIsPrimaryKey(false)
-                .setColumnDetails(new ColumnDetails("doc", new ArrayList<String>() {{
-                    add("name");
-                    add("lucky");
-                }}))
+                .setColumnDetails(new ColumnDetails("doc", new ArrayList<String>() {
+                    {
+                        add("name");
+                        add("lucky");
+                    }
+                }))
                 .setCharacterMaximumLength(0)
                 .build();
 
@@ -201,10 +197,12 @@ class SchemaBuilderTest {
                 .setDataType("boolean")
                 .setColumnName("doc['name']['truth']")
                 .setIsPrimaryKey(false)
-                .setColumnDetails(new ColumnDetails("doc", new ArrayList<String>() {{
-                    add("name");
-                    add("truth");
-                }}))
+                .setColumnDetails(new ColumnDetails("doc", new ArrayList<String>() {
+                    {
+                        add("name");
+                        add("truth");
+                    }
+                }))
                 .setCharacterMaximumLength(0)
                 .build();
 
@@ -212,9 +210,11 @@ class SchemaBuilderTest {
                 .setDataType("bigint")
                 .setColumnName("doc['name_object']")
                 .setIsPrimaryKey(false)
-                .setColumnDetails(new ColumnDetails("doc", new ArrayList<String>() {{
-                    add("name_object");
-                }}))
+                .setColumnDetails(new ColumnDetails("doc", new ArrayList<String>() {
+                    {
+                        add("name_object");
+                    }
+                }))
                 .setCharacterMaximumLength(0)
                 .build();
 
@@ -222,9 +222,11 @@ class SchemaBuilderTest {
                 .setDataType("text")
                 .setColumnName("doc['name_object_text']")
                 .setIsPrimaryKey(false)
-                .setColumnDetails(new ColumnDetails("doc", new ArrayList<String>() {{
-                    add("name_object_text");
-                }}))
+                .setColumnDetails(new ColumnDetails("doc", new ArrayList<String>() {
+                    {
+                        add("name_object_text");
+                    }
+                }))
                 .setCharacterMaximumLength(0)
                 .build();
 
@@ -232,12 +234,13 @@ class SchemaBuilderTest {
                 .setDataType("bigint")
                 .setColumnName("doc['name_int']")
                 .setIsPrimaryKey(false)
-                .setColumnDetails(new ColumnDetails("doc", new ArrayList<String>() {{
-                    add("name_int");
-                }}))
+                .setColumnDetails(new ColumnDetails("doc", new ArrayList<String>() {
+                    {
+                        add("name_int");
+                    }
+                }))
                 .setCharacterMaximumLength(0)
                 .build();
-
 
         columns.add(column1);
         columns.add(column2);
@@ -251,22 +254,17 @@ class SchemaBuilderTest {
         Schema.I expected = Schema.Dict.of(
                 "name_object", Schema.Coli.of(
                         Schema.Primitive.BIGINT,
-                        Schema.Primitive.TEXT
-                ),
+                        Schema.Primitive.TEXT),
                 "name", Schema.Coli.of(
                         Schema.Dict.of(
                                 "lucky", Schema.Primitive.BIGINT,
-                                "truth", Schema.Primitive.BOOLEAN
-                        ),
-                        Schema.Primitive.BIGINT
-                )
-        );
+                                "truth", Schema.Primitive.BOOLEAN),
+                        Schema.Primitive.BIGINT));
 
         Schema.I result = SchemaBuilder.fromInformationSchema(columns);
         assertThat(result).isEqualTo(Schema.Dict.of(
                 "id", Schema.Primitive.TEXT,
-                "doc", expected
-        ));
+                "doc", expected));
     }
 
     @Test
@@ -300,15 +298,11 @@ class SchemaBuilderTest {
         columns.add(column4);
 
         Schema.I result = SchemaBuilder.fromInformationSchema(columns);
-        assertThat(result).
-                isEqualTo(Schema.Dict.of(
-                        "doc", Schema.Dict.of(
-                                "name_{",
-                                Schema.Array.of(Schema.Dict.of(
-                                        "lucky", Schema.Primitive.BIGINT,
-                                        "truth", Schema.Primitive.BOOLEAN
-                                ))
-                        )
-                ));
+        assertThat(result).isEqualTo(Schema.Dict.of(
+                "doc", Schema.Dict.of(
+                        "name_{",
+                        Schema.Array.of(Schema.Dict.of(
+                                "lucky", Schema.Primitive.BIGINT,
+                                "truth", Schema.Primitive.BOOLEAN)))));
     }
 }

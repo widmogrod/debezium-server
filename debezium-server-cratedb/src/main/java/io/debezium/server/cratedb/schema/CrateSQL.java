@@ -46,8 +46,8 @@ public class CrateSQL {
 
     private static Map<List<Object>, Schema.I> extractNestedObjectTypes(List<Object> path, Schema.I beforeSchema, Schema.I afterSchema) {
         return switch (beforeSchema) {
-            case Schema.Dict(Map<Object, Schema.I> fieldsBefore) -> switch (afterSchema) {
-                case Schema.Dict(Map<Object, Schema.I> fieldsAfter) -> {
+            case Schema.Dict(Map < Object, Schema.I > fieldsBefore) -> switch (afterSchema) {
+                case Schema.Dict(Map < Object, Schema.I > fieldsAfter) -> {
                     Map<List<Object>, Schema.I> result = new HashMap<>();
                     for (var after : fieldsAfter.entrySet()) {
                         var afterField = after.getKey();
@@ -60,8 +60,9 @@ public class CrateSQL {
                         Map<List<Object>, Schema.I> nestedArrays = null;
                         if (fieldsBefore.containsKey(afterField)) {
                             var beforeValue = fieldsBefore.get(afterField);
-                            nestedArrays  = extractNestedObjectTypes(newPath, beforeValue, afterValue);
-                        } else {
+                            nestedArrays = extractNestedObjectTypes(newPath, beforeValue, afterValue);
+                        }
+                        else {
                             nestedArrays = extractNestedArrayTypes(newPath, afterValue);
                         }
 
@@ -78,7 +79,7 @@ public class CrateSQL {
 
     public static Map<List<Object>, Schema.I> extractNestedArrayTypes(List<Object> path, Schema.I schema) {
         return switch (schema) {
-            case Schema.Dict(Map<Object, Schema.I> fields) -> {
+            case Schema.Dict(Map < Object, Schema.I > fields) -> {
                 Map<List<Object>, Schema.I> result = new HashMap<>();
                 for (var entry : fields.entrySet()) {
                     var fieldName = entry.getKey();
@@ -100,12 +101,12 @@ public class CrateSQL {
                 nested.put(path, arr);
                 yield nested;
             }
-//            case Schema.Coli(Set<Schema.I> set)  -> new HashMap() {{
-//                var nested = extractNestedArrayTypes(new ArrayList<>(path), set.iterator().next());
-//                nested.putAll(nested);
-//
-//                putAll(nested);
-//            }};
+            // case Schema.Coli(Set<Schema.I> set) -> new HashMap() {{
+            // var nested = extractNestedArrayTypes(new ArrayList<>(path), set.iterator().next());
+            // nested.putAll(nested);
+            //
+            // putAll(nested);
+            // }};
             default -> new HashMap<>();
         };
     }

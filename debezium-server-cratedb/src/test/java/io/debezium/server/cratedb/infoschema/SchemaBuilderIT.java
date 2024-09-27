@@ -5,7 +5,23 @@
  */
 package io.debezium.server.cratedb.infoschema;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+
+import java.sql.PreparedStatement;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.debezium.server.cratedb.CrateTestResourceLifecycleManager;
 import io.debezium.server.cratedb.datagen.DataGen;
 import io.debezium.server.cratedb.schema.CrateSQL;
@@ -13,20 +29,6 @@ import io.debezium.server.cratedb.schema.Evolution;
 import io.debezium.server.cratedb.schema.Schema;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.sql.PreparedStatement;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
-import static org.junit.Assert.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 @QuarkusTest
 @QuarkusTestResource(CrateTestResourceLifecycleManager.class)
@@ -76,9 +78,7 @@ class SchemaBuilderIT {
                     "doc", Schema.Dict.of(
                             "name", Schema.Primitive.TEXT,
                             "name_bigint_array", Schema.Array.of(Schema.Primitive.BIGINT),
-                            "truth", Schema.Primitive.BOOLEAN
-                    )
-            ));
+                            "truth", Schema.Primitive.BOOLEAN)));
         });
     }
 
@@ -132,13 +132,12 @@ class SchemaBuilderIT {
                     var object1 = result1.getRight();
                     LOGGER.info("BEFORE schema1: {}", schema1);
                     LOGGER.error("BEFORE object1: {}", object1);
-//                    var object2 = Evolution.sanitizeData(schema1, object1);
-//                    LOGGER.error("BEFORE object2: {}", object2);
-//                    var alters = CrateSQL.toSQL("test", manager1, schema1);
+                    // var object2 = Evolution.sanitizeData(schema1, object1);
+                    // LOGGER.error("BEFORE object2: {}", object2);
+                    // var alters = CrateSQL.toSQL("test", manager1, schema1);
                     var alters = CrateSQL.toSQL("test",
                             Schema.Dict.of("doc", manager1),
-                            Schema.Dict.of("doc", schema1)
-                    );
+                            Schema.Dict.of("doc", schema1));
 
                     manager1 = schema1;
 
@@ -196,9 +195,9 @@ class SchemaBuilderIT {
             LOGGER.info("manager3={}", manager3);
 
             assertThat(Evolution.similar(manager1, manager3)).isTrue();
-//            assertThat(manager1).
-//                    usingRecursiveComparison().
-//                    isEqualTo(manager3);
+            // assertThat(manager1).
+            // usingRecursiveComparison().
+            // isEqualTo(manager3);
         });
     }
 }
