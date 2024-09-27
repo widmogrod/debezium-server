@@ -64,10 +64,12 @@ public class SchemaBuilder {
                                 var el = element.get();
                                 if (el instanceof Schema.Array arr && arr.innerType() instanceof Schema.Dict) {
                                     fieldType = Schema.Dict.of(fieldName2, Schema.Array.of(fieldType));
-                                } else {
+                                }
+                                else {
                                     fieldType = Schema.Dict.of(fieldName2, fieldType);
                                 }
-                            } else {
+                            }
+                            else {
                                 fieldType = Schema.Dict.of(fieldName2, fieldType);
                             }
                             continue;
