@@ -21,8 +21,8 @@ public class CrateSQL {
     public static List<String> toSQL(String tableName, Schema.I beforeSchema, Schema.I afterSchema) {
         // find differences between schemas
         return switch (beforeSchema) {
-            case Schema.Dict(Map<Object, Schema.I> fieldsBefore) -> switch (afterSchema) {
-                case Schema.Dict(Map<Object, Schema.I> fieldsAfter) -> {
+            case Schema.Dict(Map < Object, Schema.I > fieldsBefore) -> switch (afterSchema) {
+                case Schema.Dict(Map < Object, Schema.I > fieldsAfter) -> {
                     var result = new ArrayList<String>();
                     var nestedArrays = extractNestedObjectTypes(List.of(), beforeSchema, afterSchema);
 

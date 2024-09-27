@@ -429,10 +429,6 @@ public class CrateExperiments {
                 for (var elem : info) {
                     LOGGER.error("Column details: {}", elem);
                 }
-
-                ColumnTypeManager manager = new ColumnTypeManager();
-                manager.fromInformationSchema(info);
-                manager.print();
             }
         });
 
