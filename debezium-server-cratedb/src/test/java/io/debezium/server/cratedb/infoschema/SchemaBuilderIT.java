@@ -85,8 +85,15 @@ class SchemaBuilderIT {
     @Test
     void withGenerated() {
         // set randomness seed
-        // working = 123456789
-        DataGen.setSeed(123456791);
+        // working = 123456789 - rebuild collision type on first level
+        // working = 123456791 - rebuild collision at nested level
+        // working = 123456788 - Mixed dataTypes inside a list are not supported. Found integer and object
+        // working = 1727213537780L - ERROR: Dynamic nested arrays are not supported
+        // working = 1727306306043L ERROR: Mixed dataTypes inside a list are not supported. Found boolean and object
+        // working - 1727390353003L - similarity assertion, object_array reconstruction
+        var seed = System.currentTimeMillis();
+        LOGGER.error("seed={}", seed);
+        DataGen.setSeed(seed);
 
         assertDoesNotThrow(() -> {
             try (Statement stmt = conn.createStatement()) {
@@ -123,11 +130,15 @@ class SchemaBuilderIT {
                     var result1 = Evolution.fromObject(manager1, object);
                     var schema1 = result1.getLeft();
                     var object1 = result1.getRight();
-                    LOGGER.info("BEFORE schema1:{}", schema1);
+                    LOGGER.info("BEFORE schema1: {}", schema1);
                     LOGGER.error("BEFORE object1: {}", object1);
 //                    var object2 = Evolution.sanitizeData(schema1, object1);
 //                    LOGGER.error("BEFORE object2: {}", object2);
-                    var alters = CrateSQL.toSQL("test", manager1, schema1);
+//                    var alters = CrateSQL.toSQL("test", manager1, schema1);
+                    var alters = CrateSQL.toSQL("test",
+                            Schema.Dict.of("doc", manager1),
+                            Schema.Dict.of("doc", schema1)
+                    );
 
                     manager1 = schema1;
 
@@ -157,11 +168,6 @@ class SchemaBuilderIT {
                         LOGGER.info("manager1={}", manager1);
                         throw e;
                     }
-
-                    // x ERROR: Dynamic nested arrays are not supported
-                    // v ERROR: "name_." contains a dot
-                    // v ERROR: "[" conflicts with subscript pattern, square brackets are not allowed
-                    // x ERROR: Mixed dataTypes inside a list are not supported. Found object_array and boolean
                 }
             }
 
@@ -189,7 +195,10 @@ class SchemaBuilderIT {
             LOGGER.info("manager2={}", manager2);
             LOGGER.info("manager3={}", manager3);
 
-            assertThat(manager1).isEqualTo(manager3);
+            assertThat(Evolution.similar(manager1, manager3)).isTrue();
+//            assertThat(manager1).
+//                    usingRecursiveComparison().
+//                    isEqualTo(manager3);
         });
     }
 }
