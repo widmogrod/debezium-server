@@ -5,13 +5,13 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import org.junit.jupiter.api.Test;
+import static io.debezium.server.cratedb.schema.Evolution.fromObject;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 import java.util.List;
 import java.util.Map;
 
-import static io.debezium.server.cratedb.schema.Evolution.fromObject;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import org.junit.jupiter.api.Test;
 
 class SchemaTest {
     @Test
@@ -19,8 +19,7 @@ class SchemaTest {
         // [[666, 666], [], Queen]
         var schema0 = Schema.Dict.of();
         var object0 = Map.of(
-                "name", List.of(List.of(), List.of(666, 666), "Queen")
-        );
+                "name", List.of(List.of(), List.of(666, 666), "Queen"));
 
         var result = fromObject(schema0, object0);
         var schema1 = result.getLeft();
@@ -30,17 +29,12 @@ class SchemaTest {
                 "name", Schema.Array.of(
                         Schema.Coli.of(
                                 Schema.Array.of(Schema.Coli.of(Schema.Primitive.BIGINT, Schema.Primitive.NULL)),
-                                Schema.Primitive.TEXT
-                        )
-                )
-        ));
+                                Schema.Primitive.TEXT))));
         assertThat(object1).isEqualTo(Map.of(
                 "name", List.of(
-                        List.of(),
+                        PartialValue.of(null, List.of()),
                         List.of(PartialValue.of(null, 666), PartialValue.of(null, 666)),
-                        PartialValue.of(null, "Queen")
-                )
-        ));
+                        PartialValue.of(null, "Queen"))));
     }
 
     @Test
@@ -51,8 +45,7 @@ class SchemaTest {
                 "name[]", 2,
                 "name{}", 3,
                 "name:", 4,
-                "name;", 5
-        );
+                "name;", 5);
 
         var result = fromObject(schema, object01);
         var object1 = result.getRight();
@@ -62,8 +55,7 @@ class SchemaTest {
                 "namebkt__bkt", 2,
                 "name{}", 3,
                 "name:", 4,
-                "name_semicolon_", 5
-        ));
+                "name_semicolon_", 5));
     }
 
     @Test
@@ -91,10 +83,9 @@ class SchemaTest {
                                 Map.of("zip-code", "12-345")),
                         "list_of_list", List.of(List.of(false)),
                         "bag", List.of(1, PartialValue.of(null, false),
-                                 PartialValue.of(null, "??"), 2,
-                                 PartialValue.of(null, true),
-                                 PartialValue.of(null, "!")))
-        );
+                                PartialValue.of(null, "??"), 2,
+                                PartialValue.of(null, true),
+                                PartialValue.of(null, "!"))));
         // schema must be immutable
         assertThat(schema).isEqualTo(Schema.Dict.of());
         // new schema must reflect input object structure
@@ -127,10 +118,7 @@ class SchemaTest {
                         "age", PartialValue.of(null, "not available"),
                         "address", List.of(
                                 Map.of("zip-code_bool_array", PartialValue.of("[false]", List.of(false))),
-                                Map.of("country", "Poland")
-                        )
-                )
-        );
+                                Map.of("country", "Poland"))));
         // schema must be immutable
         assertThat(schema1).isEqualTo(
                 Schema.Dict.of(
