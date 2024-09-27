@@ -55,13 +55,27 @@ public class SchemaBuilder {
                         var fieldName2 = list.get(i);
                         var subPath = list.stream().limit(i + 1).toList();
                         if (list.size() - 1 != i) {
-                            fieldType = Schema.Dict.of(fieldName2, fieldType);
+//                            // FIX parent object under a path could exists
+//                            //     and it could be Array(OBJECT)
+//                            //     and in cratedb this means we need to concat arrays
+//                            //     this is only valid assumption in context of infer schema
+                            var element = Evolution.fromPath(subPath, Schema.Dict.of(fields));
+                            if (element.isPresent()) {
+                                var el = element.get();
+                                if (el instanceof Schema.Array arr && arr.innerType() instanceof Schema.Dict) {
+                                    fieldType = Schema.Dict.of(fieldName2, Schema.Array.of(fieldType));
+                                } else {
+                                    fieldType = Schema.Dict.of(fieldName2, fieldType);
+                                }
+                            } else {
+                                fieldType = Schema.Dict.of(fieldName2, fieldType);
+                            }
                             continue;
                         }
 
                         // prepend subPath with detail.name()
                         var element = Evolution.fromPath(subPath, Schema.Dict.of(fields));
-                        if (!element.isEmpty()) {
+                        if (element.isPresent()) {
                             var fieldTypePrevious = element.get();
                             fieldType = Schema.Dict.of(fieldName2, fieldType);
                             fieldType = Evolution.merge(fieldTypePrevious, fieldType);
