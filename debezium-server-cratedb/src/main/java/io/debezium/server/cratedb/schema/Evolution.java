@@ -213,6 +213,12 @@ public class Evolution {
 
             case Schema.Array(Schema.I innerType) -> switch (value) {
                 case List list -> {
+                    // FIX ERROR: Dynamic nested arrays are not supported
+                    // replace [[]] with [null]
+                    if (list.isEmpty()) {
+                        yield PartialValue.of(null, list);
+                    }
+
                     var result = new ArrayList<>();
                     for (var element : list) {
                         result.add(tryCast(element, innerType));
@@ -306,6 +312,18 @@ public class Evolution {
 
             case Schema.Coli(Set<Schema.I> setA) -> switch (b) {
                 case Schema.Coli(Set<Schema.I> setB) -> Schema.Coli.of(setA, setB);
+                case Schema.Dict dict -> {
+                    // if in collision exists dict, merge them
+                    Set<Schema.I> set = new LinkedHashSet<>();
+                    for (var entry : setA) {
+                        if (entry instanceof Schema.Dict) {
+                            set.add(merge(entry, dict));
+                        } else {
+                            set.add(entry);
+                        }
+                    }
+                    yield Schema.Coli.of(set);
+                }
                 default -> Schema.Coli.of(setA, b);
             };
 

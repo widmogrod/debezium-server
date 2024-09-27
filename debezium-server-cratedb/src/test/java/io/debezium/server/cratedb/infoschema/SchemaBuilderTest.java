@@ -268,4 +268,47 @@ class SchemaBuilderTest {
                 "doc", expected
         ));
     }
+
+    @Test
+    void useCaseArrayObjectReconstruction() {
+        List<ColumnInfo> columns = new ArrayList<>();
+        ColumnInfo column1 = new ColumnInfo.Builder()
+                .setDataType("object_array")
+                .setColumnName("doc['name_{']")
+                .setIsPrimaryKey(false)
+                .setColumnDetails(new ColumnDetails("doc", List.of("name_{")))
+                .setCharacterMaximumLength(0)
+                .build();
+        columns.add(column1);
+
+        ColumnInfo column3 = new ColumnInfo.Builder()
+                .setDataType("bigint")
+                .setColumnName("doc['name_{']['lucky']")
+                .setIsPrimaryKey(false)
+                .setColumnDetails(new ColumnDetails("doc", List.of("name_{", "lucky")))
+                .setCharacterMaximumLength(0)
+                .build();
+        columns.add(column3);
+
+        ColumnInfo column4 = new ColumnInfo.Builder()
+                .setDataType("boolean")
+                .setColumnName("doc['name_{']['truth']")
+                .setIsPrimaryKey(false)
+                .setColumnDetails(new ColumnDetails("doc", List.of("name_{", "truth")))
+                .setCharacterMaximumLength(0)
+                .build();
+        columns.add(column4);
+
+        Schema.I result = SchemaBuilder.fromInformationSchema(columns);
+        assertThat(result).
+                isEqualTo(Schema.Dict.of(
+                        "doc", Schema.Dict.of(
+                                "name_{",
+                                Schema.Array.of(Schema.Dict.of(
+                                        "lucky", Schema.Primitive.BIGINT,
+                                        "truth", Schema.Primitive.BOOLEAN
+                                ))
+                        )
+                ));
+    }
 }
