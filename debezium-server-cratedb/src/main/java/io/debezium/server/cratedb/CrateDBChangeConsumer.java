@@ -40,6 +40,10 @@ import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.DebeziumEngine.RecordCommitter;
 import io.debezium.serde.DebeziumSerdes;
 import io.debezium.server.BaseChangeConsumer;
+import io.debezium.server.cratedb.infoschema.DataLoader;
+import io.debezium.server.cratedb.infoschema.SchemaBuilder;
+import io.debezium.server.cratedb.schema.Evolution;
+import io.debezium.server.cratedb.schema.Schema;
 
 /**
  * Implementation of the consumer that delivers the messages into CrateDB
@@ -62,6 +66,8 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
     // Make sure that each table is created only once
     private final Set<String> tablesToCreate = Collections.synchronizedSet(new HashSet<>());
+    // Make sure that track each table and schema evolution independently
+    private final Map<String, Schema.I> tablesSchema = Collections.synchronizedMap(new HashMap<>());
 
     // Manage extraction of id and document from the Debzium message
     // https://debezium.io/documentation/reference/stable/integrations/serdes.html
@@ -149,18 +155,50 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             PreparedStatement stmtUpsert = null;
             PreparedStatement stmtDelete = null;
 
+            // Retrieve schema definition
+            Schema.I schema0;
+            if (tablesSchema.containsKey(tableId)) {
+                schema0 = tablesSchema.get(tableId);
+            }
+            else {
+                try {
+                    var columns = DataLoader.withTableName(tableId).load(conn);
+                    schema0 = SchemaBuilder.fromInformationSchema(columns);
+                }
+                catch (Exception e) {
+                    LOGGER.error("Error while loading table {}", tableId, e);
+                    schema0 = Schema.Dict.of();
+                }
+            }
+
             for (Map.Entry<String, ChangeEvent<Object, Object>> recordEntry : tableEntry.getValue().entrySet()) {
                 String recordId = recordEntry.getKey();
                 ChangeEvent<Object, Object> record = recordEntry.getValue();
                 DebeziumMessage message = getDebeziumMessage(record);
                 DebeziumMessagePayload payload = message.getPayload();
-                String recordDoc = getRecordDoc(payload);
+
+                String operation;
+                if (payload == null) {
+                    operation = "d";
+                }
+                else {
+                    operation = payload.getOp();
+                }
 
                 try {
-                    switch (payload.getOp()) {
+                    switch (operation) {
                         case "r":
                         case "c":
                         case "u":
+                            var object0 = payload.getAfter();
+                            var result = Evolution.fromObject(schema0, object0);
+                            var schema1 = result.getLeft();
+                            var object1 = payload.getAfter();
+                            // update what we learn about schema
+                            tablesSchema.put(tableId, schema1);
+                            // use final representation of object as something we will insert into database
+                            String recordDoc = getRecordDoc(object1);
+
                             if (stmtUpsert == null) {
                                 String upsert = SQL_UPSERT.formatted(tableId);
                                 stmtUpsert = conn.prepareStatement(upsert);
@@ -180,7 +218,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                             break;
 
                         default:
-                            LOGGER.warn("Unknown operation '{}' ignoring...", payload.getOp());
+                            LOGGER.warn("Unknown operation '{}' ignoring...", operation);
                             break;
                     }
                 }
@@ -269,9 +307,9 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         }
     }
 
-    private String getRecordDoc(DebeziumMessagePayload payload) {
+    private String getRecordDoc(Object object) {
         try {
-            return convertToJson(payload.getAfter());
+            return convertToJson(object);
         }
         catch (JsonProcessingException e) {
             throw new RuntimeException(e);
