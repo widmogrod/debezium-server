@@ -5,11 +5,12 @@
  */
 package io.debezium.server.cratedb;
 
-import io.debezium.server.TestConfigSource;
-import org.apache.kafka.connect.runtime.standalone.StandaloneConfig;
-
 import java.util.HashMap;
 import java.util.Map;
+
+import org.apache.kafka.connect.runtime.standalone.StandaloneConfig;
+
+import io.debezium.server.TestConfigSource;
 
 public class CrateDBTestConfigSource extends TestConfigSource {
 
@@ -17,10 +18,8 @@ public class CrateDBTestConfigSource extends TestConfigSource {
         Map<String, String> cratedbTest = new HashMap<>();
 
         cratedbTest.put("debezium.sink.type", "cratedb");
-        // NOTICE: debezium.source details like password, port
-        //         are injected by PostgresTestResourceLifecycleManager.start()
-        //         remember to use @QuarkusTestResource(PostgresTestResourceLifecycleManager.class)
-        //         in your integration test
+        // NOTICE: debezium.source details like password, port are injected by PostgresTestResourceLifecycleManager.start()
+        // remember to use @QuarkusTestResource(PostgresTestResourceLifecycleManager.class) in your integration test
         cratedbTest.put("debezium.source.connector.class", "io.debezium.connector.postgresql.PostgresConnector");
         cratedbTest.put("debezium.source." + StandaloneConfig.OFFSET_STORAGE_FILE_FILENAME_CONFIG, OFFSET_STORE_PATH.toAbsolutePath().toString());
         cratedbTest.put("debezium.source.offset.flush.interval.ms", "0");

@@ -5,6 +5,25 @@
  */
 package io.debezium.server.cratedb;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.Duration;
+
+import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
+
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.server.DebeziumServer;
@@ -14,23 +33,6 @@ import io.debezium.server.events.TaskStartedEvent;
 import io.debezium.util.Testing;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
-import jakarta.enterprise.event.Observes;
-import jakarta.inject.Inject;
-import org.awaitility.Awaitility;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.time.Duration;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Integration test that verifies basic reading from PostgreSQL database and writing to CrateDB stream.
@@ -87,21 +89,20 @@ public class CrateDBIT {
         // didn't change configuration.
         // Also, this section can help to document what are configuration settings necessary for connector to work.
         var props = server.getProps();
-        assertThat(props).
-                containsEntry("connector.class", "io.debezium.connector.postgresql.PostgresConnector").
-                containsEntry("name", "cratedb").
-                containsEntry("file", CrateDBTestConfigSource.TEST_FILE_PATH.toString()).
-                containsEntry("offset.storage.file.filename", CrateDBTestConfigSource.OFFSET_STORE_PATH.toString()).
-                containsEntry("schema.include.list", "inventory").
-                containsEntry("table.include.list", "inventory.customers, inventory.cratedb_test").
-                containsEntry("transforms", "addheader, hoist").
-                containsEntry("transforms.hoist.type", "org.apache.kafka.connect.transforms.HoistField$Value").
-                containsEntry("transforms.hoist.field", "payload").
-                containsEntry("offset.storage.cratedb.connection_url", CrateTestResourceLifecycleManager.getUrl());
+        assertThat(props).containsEntry("connector.class", "io.debezium.connector.postgresql.PostgresConnector")
+                .containsEntry("name", "cratedb")
+                .containsEntry("file", CrateDBTestConfigSource.TEST_FILE_PATH.toString())
+                .containsEntry("offset.storage.file.filename", CrateDBTestConfigSource.OFFSET_STORE_PATH.toString())
+                .containsEntry("schema.include.list", "inventory")
+                .containsEntry("table.include.list", "inventory.customers, inventory.cratedb_test")
+                .containsEntry("transforms", "addheader, hoist")
+                .containsEntry("transforms.hoist.type", "org.apache.kafka.connect.transforms.HoistField$Value")
+                .containsEntry("transforms.hoist.field", "payload")
+                .containsEntry("offset.storage.cratedb.connection_url", CrateTestResourceLifecycleManager.getUrl());
     }
 
     @Test
-    public void testCrateDB() {
+    void testCrateDB() {
         Testing.Print.enable();
 
         Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
@@ -166,7 +167,7 @@ public class CrateDBIT {
     }
 
     @Test
-    public void testCrateDB2() {
+    void testInsertsAndDeletes() {
         Testing.Print.enable();
 
         Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
@@ -181,20 +182,20 @@ public class CrateDBIT {
             LOGGER.info("SHOW PSQL");
             Thread.sleep(3000);
             connection.query("SELECT\n" +
-                             "    table_schema || '.' || table_name\n" +
-                             "FROM\n" +
-                             "    information_schema.tables\n" +
-                             "WHERE\n" +
-                             "    table_type = 'BASE TABLE'\n" +
-                             "AND\n" +
-                             "    table_schema NOT IN ('pg_catalog', 'information_schema');", new JdbcConnection.ResultSetConsumer() {
-                @Override
-                public void accept(ResultSet rs) throws SQLException {
-                    while (rs.next()) {
-                        LOGGER.info("Table {}", rs.getString(1));
-                    }
-                }
-            });
+                    "    table_schema || '.' || table_name\n" +
+                    "FROM\n" +
+                    "    information_schema.tables\n" +
+                    "WHERE\n" +
+                    "    table_type = 'BASE TABLE'\n" +
+                    "AND\n" +
+                    "    table_schema NOT IN ('pg_catalog', 'information_schema');", new JdbcConnection.ResultSetConsumer() {
+                        @Override
+                        public void accept(ResultSet rs) throws SQLException {
+                            while (rs.next()) {
+                                LOGGER.info("Table {}", rs.getString(1));
+                            }
+                        }
+                    });
 
             connection.close();
 
