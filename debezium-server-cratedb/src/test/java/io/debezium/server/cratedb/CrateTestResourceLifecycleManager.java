@@ -44,9 +44,6 @@ public class CrateTestResourceLifecycleManager implements QuarkusTestResourceLif
         }
 
         return String.format(JDBC_CRATE_URL_FORMAT,
-                // CRATEDB_USER,
-                // CRATEDB_PASSWORD,
-                // "localhost",
                 container.getHost(),
                 container.getMappedPort(CRATEDB_PORT).toString());
     }
