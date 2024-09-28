@@ -31,8 +31,9 @@ public class CrateDBTestConfigSource extends TestConfigSource {
         // Leaving this line, if by any change, the behaviour will change
         cratedbTest.put("debezium.source.table.include.list", "inventory.customers, inventory.cratedb_test");
 
-        cratedbTest.put("debezium.transforms", "addheader, hoist");
-        cratedbTest.put("debezium.transforms.hoist.field", "payload");
+        cratedbTest.put("debezium.transforms", "addheader");
+        // cratedbTest.put("debezium.transforms", "addheader, hoist");
+        // cratedbTest.put("debezium.transforms.hoist.field", "payload");
         cratedbTest.put("debezium.transforms.addheader.type", "org.apache.kafka.connect.transforms.InsertHeader");
         cratedbTest.put("debezium.transforms.addheader.header", "headerKey");
         cratedbTest.put("debezium.transforms.addheader.value.literal", "headerValue");

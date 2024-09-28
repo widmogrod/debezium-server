@@ -174,15 +174,19 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             for (Map.Entry<String, ChangeEvent<Object, Object>> recordEntry : tableEntry.getValue().entrySet()) {
                 String recordId = recordEntry.getKey();
                 ChangeEvent<Object, Object> record = recordEntry.getValue();
-                DebeziumMessage message = getDebeziumMessage(record);
-                DebeziumMessagePayload payload = message.getPayload();
+                DebeziumMessagePayload payload = getDebeziumMessage(record);
 
                 String operation;
                 if (payload == null) {
                     operation = "d";
                 }
-                else {
+                else if (payload.getOp() != null) {
                     operation = payload.getOp();
+                }
+                else {
+                    LOGGER.error("Payload {}", payload);
+                    LOGGER.error("record={}", record);
+                    operation = "unknown";
                 }
 
                 try {
@@ -281,17 +285,23 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         }
     }
 
-    private DebeziumMessage getDebeziumMessage(ChangeEvent<Object, Object> record) {
+    private DebeziumMessagePayload getDebeziumMessage(ChangeEvent<Object, Object> record) {
         Object value = record.value();
         if (value == null) {
-            return new DebeziumMessage(
-                    new DebeziumMessagePayload(
-                            "d",
-                            null));
+            return new DebeziumMessagePayload(
+                    "d",
+                    null);
         }
 
+        var bytes = getBytes(value);
+
         try {
-            return serdeValue.readValue(getBytes(record.value()), DebeziumMessage.class);
+            var message = serdeValue.readValue(bytes, DebeziumMessage.class);
+            if (message == null || message.getPayload() == null) {
+                return serdeValue.readValue(bytes, DebeziumMessagePayload.class);
+            }
+
+            return message.getPayload();
         }
         catch (IOException e) {
             throw new RuntimeException(e);

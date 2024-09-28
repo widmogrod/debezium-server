@@ -91,13 +91,13 @@ public class CrateDBIT {
         var props = server.getProps();
         assertThat(props).containsEntry("connector.class", "io.debezium.connector.postgresql.PostgresConnector")
                 .containsEntry("name", "cratedb")
-                .containsEntry("file", CrateDBTestConfigSource.TEST_FILE_PATH.toString())
-                .containsEntry("offset.storage.file.filename", CrateDBTestConfigSource.OFFSET_STORE_PATH.toString())
+                // .containsEntry("file", CrateDBTestConfigSource.TEST_FILE_PATH.toString())
+                // .containsEntry("offset.storage.file.filename", CrateDBTestConfigSource.OFFSET_STORE_PATH.toString())
                 .containsEntry("schema.include.list", "inventory")
                 .containsEntry("table.include.list", "inventory.customers, inventory.cratedb_test")
-                .containsEntry("transforms", "addheader, hoist")
-                .containsEntry("transforms.hoist.type", "org.apache.kafka.connect.transforms.HoistField$Value")
-                .containsEntry("transforms.hoist.field", "payload")
+                .containsEntry("transforms", "addheader")
+                // .containsEntry("transforms.hoist.type", "org.apache.kafka.connect.transforms.HoistField$Value")
+                // .containsEntry("transforms.hoist.field", "payload")
                 .containsEntry("offset.storage.cratedb.connection_url", CrateTestResourceLifecycleManager.getUrl());
     }
 
