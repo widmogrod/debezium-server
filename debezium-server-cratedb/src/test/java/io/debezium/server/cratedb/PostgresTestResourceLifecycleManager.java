@@ -20,7 +20,7 @@ public class PostgresTestResourceLifecycleManager implements QuarkusTestResource
     public static final String POSTGRES_USER = "postgres";
     public static final String POSTGRES_PASSWORD = "postgres";
     public static final String POSTGRES_DBNAME = "postgres";
-    public static final String POSTGRES_IMAGE = "quay.io/debezium/example-postgres";
+    public static final String POSTGRES_IMAGE = "quay.io/debezium/example-postgres:2.7.0.Final";
     public static final Integer POSTGRES_PORT = 5432;
 
     private static final GenericContainer<?> container;
