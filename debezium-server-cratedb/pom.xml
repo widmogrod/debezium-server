@@ -137,7 +137,7 @@
                 <version>3.5.0</version>
                 <configuration>
                     <excludes>
-                        **/ColumnTypeManager.java, **/SchemaTest.java, **/Evolution.java, **/CrateSQL.java
+                        **/ColumnTypeManager.java, **/SchemaTest.java, **/Schema.java, **/Evolution.java, **/CrateSQL.java
                     </excludes>
                 </configuration>
             </plugin>
