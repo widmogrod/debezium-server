@@ -5,12 +5,11 @@
  */
 package io.debezium.server.cratedb;
 
-import java.util.HashMap;
-import java.util.Map;
-
+import io.debezium.server.TestConfigSource;
 import org.apache.kafka.connect.runtime.standalone.StandaloneConfig;
 
-import io.debezium.server.TestConfigSource;
+import java.util.HashMap;
+import java.util.Map;
 
 public class CrateDBTestConfigSource extends TestConfigSource {
 
@@ -18,20 +17,26 @@ public class CrateDBTestConfigSource extends TestConfigSource {
         Map<String, String> cratedbTest = new HashMap<>();
 
         cratedbTest.put("debezium.sink.type", "cratedb");
-        // cratedbTest.put("debezium.sink.cratedb.connection_url", "jdbc:postgresql://%s:%s/?user=crate");
-        // cratedbTest.put("debezium.source.connector.class", "io.debezium.connector.mysql.MySqlConnector");
-        // cratedbTest.put("debezium.source.database.hostname", "mysql");
-        // cratedbTest.put("debezium.source.database.port", "3306");
-        // cratedbTest.put("debezium.source.database.user", "debezium");
-        // cratedbTest.put("debezium.source.database.password", "dbz");
-        // cratedbTest.put("debezium.source.database.server.id", "23");
-        // cratedbTest.put("debezium.sink.kinesis.region", KINESIS_REGION);
+        // NOTICE: debezium.source details like password, port
+        //         are injected by PostgresTestResourceLifecycleManager.start()
+        //         remember to use @QuarkusTestResource(PostgresTestResourceLifecycleManager.class)
+        //         in your integration test
         cratedbTest.put("debezium.source.connector.class", "io.debezium.connector.postgresql.PostgresConnector");
         cratedbTest.put("debezium.source." + StandaloneConfig.OFFSET_STORAGE_FILE_FILENAME_CONFIG, OFFSET_STORE_PATH.toAbsolutePath().toString());
         cratedbTest.put("debezium.source.offset.flush.interval.ms", "0");
         cratedbTest.put("debezium.source.topic.prefix", "testc");
         cratedbTest.put("debezium.source.schema.include.list", "inventory");
-        cratedbTest.put("debezium.source.table.include.list", "inventory.customers");
+
+        // There is strange bug, and if I don't define DEBEZIUM_SOURCE_TABLE_INCLUDE_LIST it always sets "public.table_name"
+        cratedbTest.put("DEBEZIUM_SOURCE_TABLE_INCLUDE_LIST", "inventory.customers, inventory.cratedb_test");
+        // Leaving this line, if by any change, the behaviour will change
+        cratedbTest.put("debezium.source.table.include.list", "inventory.customers, inventory.cratedb_test");
+
+        cratedbTest.put("debezium.transforms", "addheader, hoist");
+        cratedbTest.put("debezium.transforms.hoist.field", "payload");
+        cratedbTest.put("debezium.transforms.addheader.type", "org.apache.kafka.connect.transforms.InsertHeader");
+        cratedbTest.put("debezium.transforms.addheader.header", "headerKey");
+        cratedbTest.put("debezium.transforms.addheader.value.literal", "headerValue");
 
         config = cratedbTest;
     }
