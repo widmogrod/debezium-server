@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration test that verifies basic reading from PostgreSQL database and writing to CrateDB stream.
+ * Integration test that verifies basic reading from PostgresSQL database and writing to CrateDB stream.
  *
  * @author Gabriel habryn
  */
@@ -103,45 +103,52 @@ public class CrateDBIT {
     }
 
     @Test
-    void testCrateDB() {
+    void testPostgresDefaultState() throws SQLException, JsonProcessingException {
         Testing.Print.enable();
 
+        List<Map<String, Object>> expectedResults = List.of(
+                Map.of("id", "\"1001\"", "doc", Map.of("last_name", "Thomas", "id", 1001, "first_name", "Sally", "email", "sally.thomas@acme.com")),
+                Map.of("id", "\"1002\"", "doc", Map.of("last_name", "Bailey", "id", 1002, "first_name", "George", "email", "gbailey@foobar.com")),
+                Map.of("id", "\"1003\"", "doc", Map.of("last_name", "Walker", "id", 1003, "first_name", "Edward", "email", "ed@walker.com")),
+                Map.of("id", "\"1004\"", "doc", Map.of("last_name", "Kretchmar", "id", 1004, "first_name", "Anne", "email", "annek@noanswer.org"))
+        );
+
+        Statement stmt = conn.createStatement();
+
         Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
-            Statement stmt = conn.createStatement();
-
-            Thread.sleep(3000);
-            LOGGER.info("REFRESH testc_inventory_customers!");
-            stmt.execute("REFRESH TABLE testc_inventory_customers;");
-
-            LOGGER.info("SELECT * FROM testc_inventory_customers;");
-            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_customers ORDER BY id ASC;");
-
-            List<Object> results = new ArrayList<>();
-            while (itemsSet.next()) {
-                String id = itemsSet.getString(1);
-                String docJson = itemsSet.getString(2);
-                Map doc = new ObjectMapper().readValue(docJson, Map.class);
-                results.add(Map.of("id", id, "doc", doc));
+            try {
+                stmt.execute("REFRESH TABLE testc_inventory_customers;");
+                var result = stmt.executeQuery("SELECT COUNT(1) FROM testc_inventory_customers");
+                result.next();
+                return result.getInt(1) == expectedResults.size();
             }
-            itemsSet.close();
-
-            List<Map<String, Object>> expectedResults = List.of(
-                    Map.of("id", "\"1001\"", "doc", Map.of("last_name", "Thomas", "id", 1001, "first_name", "Sally", "email", "sally.thomas@acme.com")),
-                    Map.of("id", "\"1002\"", "doc", Map.of("last_name", "Bailey", "id", 1002, "first_name", "George", "email", "gbailey@foobar.com")),
-                    Map.of("id", "\"1003\"", "doc", Map.of("last_name", "Walker", "id", 1003, "first_name", "Edward", "email", "ed@walker.com")),
-                    Map.of("id", "\"1004\"", "doc", Map.of("last_name", "Kretchmar", "id", 1004, "first_name", "Anne", "email", "annek@noanswer.org")));
-
-            assertThat(results).usingRecursiveComparison().isEqualTo(expectedResults);
-
-            return true;
+            catch (SQLException e) {
+                return false;
+            }
         });
+
+        // Collect table representation
+        List<Object> results = new ArrayList<>();
+        ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_customers ORDER BY id ASC;");
+        while (itemsSet.next()) {
+            String id = itemsSet.getString(1);
+            String docJson = itemsSet.getString(2);
+            Map doc = new ObjectMapper().readValue(docJson, Map.class);
+            results.add(Map.of("id", id, "doc", doc));
+        }
+        itemsSet.close();
+
+        // Make sure we have expected state
+        assertThat(results).usingRecursiveComparison().isEqualTo(expectedResults);
     }
 
     @Test
-    void testInsertsAndDeletes() throws SQLException, JsonProcessingException {
+    void testPostgresCustomTableAndInsertsAndDeletes() throws SQLException, JsonProcessingException {
         Testing.Print.enable();
 
         Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
+            // NOTE: Running this code inside await ensures that Debezium sees those changes as CDC events, and not as snapshot (reads)
+            // which makes more accurate representation of how CrateDB state will look after all those operations
             final PostgresConnection connection = PostgresTestResourceLifecycleManager.getPostgresConnection();
             // data manipulation
             connection.execute("CREATE TABLE inventory.cratedb_test (id INT PRIMARY KEY, descr TEXT)");
