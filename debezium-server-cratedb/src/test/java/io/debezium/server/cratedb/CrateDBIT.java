@@ -13,7 +13,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
@@ -172,14 +176,24 @@ public class CrateDBIT {
 
         Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
             final PostgresConnection connection = PostgresTestResourceLifecycleManager.getPostgresConnection();
+            // data manipulation
             connection.execute("CREATE TABLE inventory.cratedb_test (id INT PRIMARY KEY, descr TEXT)");
             connection.execute("INSERT INTO inventory.cratedb_test VALUES (1, 'hello 1')");
             connection.execute("INSERT INTO inventory.cratedb_test VALUES (2, 'hello 2')");
             connection.execute("INSERT INTO inventory.cratedb_test VALUES (3, 'hello 3')");
             connection.execute("DELETE FROM inventory.cratedb_test WHERE id=1");
             connection.execute("UPDATE inventory.cratedb_test SET descr = 'hello 33' WHERE id=3");
+            // schema changes
+            connection.execute("ALTER TABLE inventory.cratedb_test ADD COLUMN new_col TEXT DEFAULT 'new description '");
+            connection.execute("INSERT INTO inventory.cratedb_test (id, descr, new_col) VALUES (4, 'hello 4', 'new data')");
+            connection.execute("INSERT INTO inventory.cratedb_test (id, descr) VALUES (5, 'hello 5')");
+            connection.execute("ALTER TABLE inventory.cratedb_test DROP COLUMN new_col");
+            connection.execute("ALTER TABLE inventory.cratedb_test RENAME COLUMN descr TO description");
+            connection.execute("INSERT INTO inventory.cratedb_test (id, description) VALUES (6, '666')");
+            connection.execute("ALTER TABLE inventory.cratedb_test ALTER COLUMN description TYPE INT USING CASE WHEN description ~ '^[0-9]+$' THEN description::integer ELSE NULL END");
+            connection.execute("INSERT INTO inventory.cratedb_test (id, description) VALUES (7, 7)");
 
-            LOGGER.info("SHOW PSQL");
+            LOGGER.info("SHOW TABLES in Postgres:");
             Thread.sleep(3000);
             connection.query("SELECT\n" +
                     "    table_schema || '.' || table_name\n" +
@@ -197,50 +211,55 @@ public class CrateDBIT {
                         }
                     });
 
+            LOGGER.info("PostgresSQL table state:");
+            connection.query("SELECT * FROM inventory.cratedb_test", new JdbcConnection.ResultSetConsumer() {
+                @Override
+                public void accept(ResultSet rs) throws SQLException {
+                    while (rs.next()) {
+                        LOGGER.info("Row: {} {}", rs.getObject(1), rs.getString(2));
+                    }
+                }
+            });
+
             connection.close();
 
             Statement stmt = conn.createStatement();
 
             Thread.sleep(3000);
             ResultSet tablesSet = stmt.executeQuery("SHOW TABLES");
-            LOGGER.info("SHOW TABLES CRATE!");
+            LOGGER.info("SHOW TABLES in CrateDB:");
             while (tablesSet.next()) {
                 LOGGER.info("{}", tablesSet.getString(1));
             }
             tablesSet.close();
 
-            Thread.sleep(3000);
             LOGGER.info("REFRESH!");
             stmt.execute("REFRESH TABLE testc_inventory_cratedb_test;");
 
-            Thread.sleep(3000);
             LOGGER.info("SELECT * FROM testc_inventory_cratedb_test;");
             ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_cratedb_test ORDER BY id ASC;");
 
-            var count = 0;
-            for (int i = 0; itemsSet.next(); i++) {
-                count++;
+            List<Object> results = new ArrayList<>();
+            while (itemsSet.next()) {
                 String id = itemsSet.getString(1);
-                String doc = itemsSet.getString(2);
-
-                LOGGER.info("id = {}", id);
-                LOGGER.info("doc = {}", doc);
-
-                switch (i) {
-                    case 0:
-                        assertThat(id).isEqualTo("\"2\"");
-                        assertThat(doc).isEqualTo("{\"descr\":\"hello 2\",\"id\":2}");
-                        break;
-
-                    case 1:
-                        assertThat(id).isEqualTo("\"3\"");
-                        assertThat(doc).isEqualTo("{\"descr\":\"hello 33\",\"id\":3}");
-                        break;
-
-                }
+                String docJson = itemsSet.getString(2);
+                Map doc = new ObjectMapper().readValue(docJson, Map.class);
+                results.add(Map.of("id", id, "doc", doc));
             }
             itemsSet.close();
-            assertThat(count).isGreaterThanOrEqualTo(2);
+
+            // TODO: figure out how to include schema changes
+            // current Debezium settings don't stream schema changes
+            // and CrateDB don't have some of the operations like change type of a column
+            List<Map<String, Object>> expectedResults = List.of(
+                    Map.of("id", "\"2\"", "doc", Map.of("descr", "hello 2", "id", 2)),
+                    Map.of("id", "\"3\"", "doc", Map.of("descr", "hello 33", "id", 3)),
+                    Map.of("id", "\"4\"", "doc", Map.of("descr", "hello 4", "new_col", "new data", "id", 4)),
+                    Map.of("id", "\"5\"", "doc", Map.of("descr", "hello 5", "new_col", "new description ", "id", 5)),
+                    Map.of("id", "\"7\"", "doc", Map.of("description", 7, "id", 7))
+            );
+
+            assertThat(results).usingRecursiveComparison().isEqualTo(expectedResults);
 
             return true;
         });
