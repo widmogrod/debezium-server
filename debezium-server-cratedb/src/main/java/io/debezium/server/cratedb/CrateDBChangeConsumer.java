@@ -5,8 +5,6 @@
  */
 package io.debezium.server.cratedb;
 
-import static java.sql.Statement.EXECUTE_FAILED;
-
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -174,7 +172,8 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 }
             }
 
-            for (Map.Entry<String, ChangeEvent<Object, Object>> recordEntry : tableEntry.getValue().entrySet()) {
+            var tableRows = tableEntry.getValue().entrySet();
+            for (Map.Entry<String, ChangeEvent<Object, Object>> recordEntry : tableRows) {
                 String recordId = recordEntry.getKey();
                 ChangeEvent<Object, Object> record = recordEntry.getValue();
                 DebeziumMessagePayload payload = getDebeziumMessage(record);
@@ -237,16 +236,18 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 if (stmtUpsert != null) {
                     int[] processed = stmtUpsert.executeBatch();
                     for (int i = 0; i < processed.length; i++) {
-                        if (processed[i] == EXECUTE_FAILED) {
-                            LOGGER.warn("Failed to upsert record {}", i);
+                        if (processed[i] != 1) {
+                            // FIXME: This is silent failure, allow configuration of this behaviour
+                            LOGGER.warn("Failed to upsert record tableId={} id={} code={}", tableId,  tableRows.stream().toList().get(i).getKey(), processed[i]);
                         }
                     }
                 }
                 if (stmtDelete != null) {
                     int[] processed = stmtDelete.executeBatch();
                     for (int i = 0; i < processed.length; i++) {
-                        if (processed[i] == EXECUTE_FAILED) {
-                            LOGGER.warn("Failed to delete record {}", i);
+                        if (processed[i] != 1) {
+                            // FIXME: This is silent failure, allow configuration of this behaviour
+                            LOGGER.warn("Failed to delete record tableId={} id={} code={}", tableId,  tableRows.stream().toList().get(i).getKey(), processed[i]);
                         }
                     }
                 }
