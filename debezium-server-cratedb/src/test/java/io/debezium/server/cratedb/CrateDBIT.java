@@ -5,7 +5,24 @@
  */
 package io.debezium.server.cratedb;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.debezium.connector.postgresql.connection.PostgresConnection;
+import io.debezium.jdbc.JdbcConnection;
+import io.debezium.server.DebeziumServer;
+import io.debezium.server.events.ConnectorCompletedEvent;
+import io.debezium.server.events.ConnectorStartedEvent;
+import io.debezium.server.events.TaskStartedEvent;
+import io.debezium.util.Testing;
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -17,26 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.enterprise.event.Observes;
-import jakarta.inject.Inject;
-
-import org.awaitility.Awaitility;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import io.debezium.connector.postgresql.connection.PostgresConnection;
-import io.debezium.jdbc.JdbcConnection;
-import io.debezium.server.DebeziumServer;
-import io.debezium.server.events.ConnectorCompletedEvent;
-import io.debezium.server.events.ConnectorStartedEvent;
-import io.debezium.server.events.TaskStartedEvent;
-import io.debezium.util.Testing;
-import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.junit.QuarkusTest;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Integration test that verifies basic reading from PostgreSQL database and writing to CrateDB stream.
@@ -111,60 +109,31 @@ public class CrateDBIT {
 
         Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
             Statement stmt = conn.createStatement();
-            ResultSet resultSet = stmt.executeQuery("SELECT 2 as v");
-            resultSet.next();
-            assertThat(resultSet.getInt("v")).isEqualTo(2);
-            resultSet.close();
-
-            Thread.sleep(3000);
-            ResultSet tablesSet = stmt.executeQuery("SHOW TABLES");
-            LOGGER.info("SHOW TABLES CRATE!");
-            while (tablesSet.next()) {
-                LOGGER.info("{}", tablesSet.getString(1));
-            }
-            tablesSet.close();
 
             Thread.sleep(3000);
             LOGGER.info("REFRESH testc_inventory_customers!");
             stmt.execute("REFRESH TABLE testc_inventory_customers;");
 
-            Thread.sleep(3000);
             LOGGER.info("SELECT * FROM testc_inventory_customers;");
             ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_customers ORDER BY id ASC;");
 
-            var count = 0;
-            for (int i = 0; itemsSet.next(); i++) {
-                count++;
+            List<Object> results = new ArrayList<>();
+            while (itemsSet.next()) {
                 String id = itemsSet.getString(1);
-                String doc = itemsSet.getString(2);
-
-                LOGGER.info("id = {}", id);
-                LOGGER.info("doc = {}", doc);
-
-                switch (i) {
-                    case 0:
-                        assertThat(id).isEqualTo("\"1001\"");
-                        assertThat(doc).isEqualTo("{\"last_name\":\"Thomas\",\"id\":1001,\"first_name\":\"Sally\",\"email\":\"sally.thomas@acme.com\"}");
-                        break;
-
-                    case 1:
-                        assertThat(id).isEqualTo("\"1002\"");
-                        assertThat(doc).isEqualTo("{\"last_name\":\"Bailey\",\"id\":1002,\"first_name\":\"George\",\"email\":\"gbailey@foobar.com\"}");
-                        break;
-
-                    case 2:
-                        assertThat(id).isEqualTo("\"1003\"");
-                        assertThat(doc).isEqualTo("{\"last_name\":\"Walker\",\"id\":1003,\"first_name\":\"Edward\",\"email\":\"ed@walker.com\"}");
-                        break;
-
-                    case 3:
-                        assertThat(id).isEqualTo("\"1004\"");
-                        assertThat(doc).isEqualTo("{\"last_name\":\"Kretchmar\",\"id\":1004,\"first_name\":\"Anne\",\"email\":\"annek@noanswer.org\"}");
-                        break;
-                }
+                String docJson = itemsSet.getString(2);
+                Map doc = new ObjectMapper().readValue(docJson, Map.class);
+                results.add(Map.of("id", id, "doc", doc));
             }
             itemsSet.close();
-            assertThat(count).isGreaterThanOrEqualTo(3);
+
+            List<Map<String, Object>> expectedResults = List.of(
+                    Map.of("id", "\"1001\"", "doc", Map.of("last_name", "Thomas", "id", 1001, "first_name", "Sally", "email", "sally.thomas@acme.com")),
+                    Map.of("id", "\"1002\"", "doc", Map.of("last_name", "Bailey", "id", 1002, "first_name", "George", "email", "gbailey@foobar.com")),
+                    Map.of("id", "\"1003\"", "doc", Map.of("last_name", "Walker", "id", 1003, "first_name", "Edward", "email", "ed@walker.com")),
+                    Map.of("id", "\"1004\"", "doc", Map.of("last_name", "Kretchmar", "id", 1004, "first_name", "Anne", "email", "annek@noanswer.org"))
+            );
+
+            assertThat(results).usingRecursiveComparison().isEqualTo(expectedResults);
 
             return true;
         });
@@ -196,20 +165,20 @@ public class CrateDBIT {
             LOGGER.info("SHOW TABLES in Postgres:");
             Thread.sleep(3000);
             connection.query("SELECT\n" +
-                    "    table_schema || '.' || table_name\n" +
-                    "FROM\n" +
-                    "    information_schema.tables\n" +
-                    "WHERE\n" +
-                    "    table_type = 'BASE TABLE'\n" +
-                    "AND\n" +
-                    "    table_schema NOT IN ('pg_catalog', 'information_schema');", new JdbcConnection.ResultSetConsumer() {
-                        @Override
-                        public void accept(ResultSet rs) throws SQLException {
-                            while (rs.next()) {
-                                LOGGER.info("Table {}", rs.getString(1));
-                            }
-                        }
-                    });
+                             "    table_schema || '.' || table_name\n" +
+                             "FROM\n" +
+                             "    information_schema.tables\n" +
+                             "WHERE\n" +
+                             "    table_type = 'BASE TABLE'\n" +
+                             "AND\n" +
+                             "    table_schema NOT IN ('pg_catalog', 'information_schema');", new JdbcConnection.ResultSetConsumer() {
+                @Override
+                public void accept(ResultSet rs) throws SQLException {
+                    while (rs.next()) {
+                        LOGGER.info("Table {}", rs.getString(1));
+                    }
+                }
+            });
 
             LOGGER.info("PostgresSQL table state:");
             connection.query("SELECT * FROM inventory.cratedb_test", new JdbcConnection.ResultSetConsumer() {
