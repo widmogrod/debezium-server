@@ -5,24 +5,7 @@
  */
 package io.debezium.server.cratedb;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.debezium.connector.postgresql.connection.PostgresConnection;
-import io.debezium.jdbc.JdbcConnection;
-import io.debezium.server.DebeziumServer;
-import io.debezium.server.events.ConnectorCompletedEvent;
-import io.debezium.server.events.ConnectorStartedEvent;
-import io.debezium.util.Testing;
-import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.junit.QuarkusTest;
-import jakarta.enterprise.event.Observes;
-import jakarta.inject.Inject;
-import org.awaitility.Awaitility;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -37,7 +20,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
+
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.debezium.connector.postgresql.connection.PostgresConnection;
+import io.debezium.jdbc.JdbcConnection;
+import io.debezium.server.DebeziumServer;
+import io.debezium.server.events.ConnectorCompletedEvent;
+import io.debezium.server.events.ConnectorStartedEvent;
+import io.debezium.util.Testing;
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
 
 /**
  * Integration test that verifies basic reading from PostgresSQL database and writing to CrateDB stream.
@@ -110,8 +113,7 @@ public class CrateDBIT {
                 Map.of("id", "\"1001\"", "doc", Map.of("last_name", "Thomas", "id", 1001, "first_name", "Sally", "email", "sally.thomas@acme.com")),
                 Map.of("id", "\"1002\"", "doc", Map.of("last_name", "Bailey", "id", 1002, "first_name", "George", "email", "gbailey@foobar.com")),
                 Map.of("id", "\"1003\"", "doc", Map.of("last_name", "Walker", "id", 1003, "first_name", "Edward", "email", "ed@walker.com")),
-                Map.of("id", "\"1004\"", "doc", Map.of("last_name", "Kretchmar", "id", 1004, "first_name", "Anne", "email", "annek@noanswer.org"))
-        );
+                Map.of("id", "\"1004\"", "doc", Map.of("last_name", "Kretchmar", "id", 1004, "first_name", "Anne", "email", "annek@noanswer.org")));
 
         Statement stmt = conn.createStatement();
 
@@ -164,7 +166,8 @@ public class CrateDBIT {
             connection.execute("INSERT INTO inventory.cratedb_test (id, descr) VALUES (5, 'hello 5')");
             // 4. let's change type of new_col from string to int
             connection.execute("ALTER TABLE inventory.cratedb_test ALTER COLUMN new_col DROP DEFAULT;");
-            connection.execute("ALTER TABLE inventory.cratedb_test ALTER COLUMN new_col TYPE INT USING CASE WHEN new_col ~ '^[0-9]+$' THEN new_col::integer ELSE NULL END");
+            connection
+                    .execute("ALTER TABLE inventory.cratedb_test ALTER COLUMN new_col TYPE INT USING CASE WHEN new_col ~ '^[0-9]+$' THEN new_col::integer ELSE NULL END");
             connection.execute("INSERT INTO inventory.cratedb_test (id, new_col) VALUES (7, 7)");
             // 6. let's change new_col to FLOAT[]
             connection.execute("""
@@ -206,37 +209,48 @@ public class CrateDBIT {
 
             // And finally check the state
             var expectedPostgresState = Arrays.asList(
-                    new HashMap<String, Object>() {{
-                        put("descr", "hello 2");
-                        put("id", 2);
-                        put("new_col", null);
-                    }},
-                    new HashMap<String, Object>() {{
-                        put("descr", "hello 33");
-                        put("id", 3);
-                        put("new_col", null);
-                    }},
-                    new HashMap<String, Object>() {{
-                        put("descr", "hello 4");
-                        put("id", 4);
-                        put("new_col", null);
-                    }},
-                    new HashMap<String, Object>() {{
-                        put("descr", "hello 5");
-                        put("id", 5);
-                        put("new_col", null);
-                    }},
-                    new HashMap<String, Object>() {{
-                        put("descr", null);
-                        put("id", 7);
-                        put("new_col", List.of(7f));
-                    }},
-                    new HashMap<String, Object>() {{
-                        put("descr", null);
-                        put("id", 8);
-                        put("new_col", List.of(1.1f, 2.2f, 3.3f));
-                    }}
-            );
+                    new HashMap<String, Object>() {
+                        {
+                            put("descr", "hello 2");
+                            put("id", 2);
+                            put("new_col", null);
+                        }
+                    },
+                    new HashMap<String, Object>() {
+                        {
+                            put("descr", "hello 33");
+                            put("id", 3);
+                            put("new_col", null);
+                        }
+                    },
+                    new HashMap<String, Object>() {
+                        {
+                            put("descr", "hello 4");
+                            put("id", 4);
+                            put("new_col", null);
+                        }
+                    },
+                    new HashMap<String, Object>() {
+                        {
+                            put("descr", "hello 5");
+                            put("id", 5);
+                            put("new_col", null);
+                        }
+                    },
+                    new HashMap<String, Object>() {
+                        {
+                            put("descr", null);
+                            put("id", 7);
+                            put("new_col", List.of(7f));
+                        }
+                    },
+                    new HashMap<String, Object>() {
+                        {
+                            put("descr", null);
+                            put("id", 8);
+                            put("new_col", List.of(1.1f, 2.2f, 3.3f));
+                        }
+                    });
             assertThat(resultPostgres).usingRecursiveAssertion().isEqualTo(expectedPostgresState);
 
             // Let's proceed with CrateDB
@@ -270,52 +284,78 @@ public class CrateDBIT {
             // TODO: figure out how to include schema changes
             // current Debezium settings don't stream schema changes
             // and CrateDB don't have some of the operations like change type of a column
-            List<HashMap<String, Object>> expectedResults = new ArrayList<>() {{
-                add(new HashMap<>() {{
-                    put("id", "\"2\"");
-                    put("doc", new HashMap<>() {{
-                        put("descr", "hello 2");
-                        put("id", 2);
-                    }});
-                }});
-                add(new HashMap<>() {{
-                    put("id", "\"3\"");
-                    put("doc", new HashMap<>() {{
-                        put("descr", "hello 33");
-                        put("id", 3);
-                    }});
-                }});
-                add(new HashMap<>() {{
-                    put("id", "\"4\"");
-                    put("doc", new HashMap<>() {{
-                        put("descr", "hello 4");
-                        put("id", 4);
-                        put("new_col", "new data");
-                    }});
-                }});
-                add(new HashMap<>() {{
-                    put("id", "\"5\"");
-                    put("doc", new HashMap<>() {{
-                        put("descr", "hello 5");
-                        put("id", 5);
-                        put("new_col", "new description ");
-                    }});
-                }});
-                add(new HashMap<>() {{
-                    put("id", "\"7\"");
-                    put("doc", new HashMap<>() {{
-                        put("id", 7);
-                        put("new_col", "7");
-                    }});
-                }});
-                add(new HashMap<>() {{
-                    put("id", "\"8\"");
-                    put("doc", new HashMap<>() {{
-                        put("id", 8);
-                        put("new_col", "[1.1, 2.2, 3.3]");
-                    }});
-                }});
-            }};
+            List<HashMap<String, Object>> expectedResults = new ArrayList<>() {
+                {
+                    add(new HashMap<>() {
+                        {
+                            put("id", "\"2\"");
+                            put("doc", new HashMap<>() {
+                                {
+                                    put("descr", "hello 2");
+                                    put("id", 2);
+                                }
+                            });
+                        }
+                    });
+                    add(new HashMap<>() {
+                        {
+                            put("id", "\"3\"");
+                            put("doc", new HashMap<>() {
+                                {
+                                    put("descr", "hello 33");
+                                    put("id", 3);
+                                }
+                            });
+                        }
+                    });
+                    add(new HashMap<>() {
+                        {
+                            put("id", "\"4\"");
+                            put("doc", new HashMap<>() {
+                                {
+                                    put("descr", "hello 4");
+                                    put("id", 4);
+                                    put("new_col", "new data");
+                                }
+                            });
+                        }
+                    });
+                    add(new HashMap<>() {
+                        {
+                            put("id", "\"5\"");
+                            put("doc", new HashMap<>() {
+                                {
+                                    put("descr", "hello 5");
+                                    put("id", 5);
+                                    put("new_col", "new description ");
+                                }
+                            });
+                        }
+                    });
+                    add(new HashMap<>() {
+                        {
+                            put("id", "\"7\"");
+                            put("doc", new HashMap<>() {
+                                {
+                                    put("id", 7);
+                                    put("new_col", "7");
+                                }
+                            });
+                        }
+                    });
+                    add(new HashMap<>() {
+                        {
+                            put("id", "\"8\"");
+                            put("doc", new HashMap<>() {
+                                {
+                                    put("id", 8);
+                                    put("new_col", "[1.1, 2.2, 3.3]");
+                                }
+                            });
+                        }
+                    });
+                }
+            };
 
             assertThat(results).usingRecursiveComparison().isEqualTo(expectedResults);
 

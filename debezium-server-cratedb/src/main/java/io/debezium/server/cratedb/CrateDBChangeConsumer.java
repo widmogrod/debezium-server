@@ -238,7 +238,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                     for (int i = 0; i < processed.length; i++) {
                         if (processed[i] != 1) {
                             // FIXME: This is silent failure, allow configuration of this behaviour
-                            LOGGER.warn("Failed to upsert record tableId={} id={} code={}", tableId,  tableRows.stream().toList().get(i).getKey(), processed[i]);
+                            LOGGER.warn("Failed to upsert record tableId={} id={} code={}", tableId, tableRows.stream().toList().get(i).getKey(), processed[i]);
                         }
                     }
                 }
@@ -247,7 +247,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                     for (int i = 0; i < processed.length; i++) {
                         if (processed[i] != 1) {
                             // FIXME: This is silent failure, allow configuration of this behaviour
-                            LOGGER.warn("Failed to delete record tableId={} id={} code={}", tableId,  tableRows.stream().toList().get(i).getKey(), processed[i]);
+                            LOGGER.warn("Failed to delete record tableId={} id={} code={}", tableId, tableRows.stream().toList().get(i).getKey(), processed[i]);
                         }
                     }
                 }
