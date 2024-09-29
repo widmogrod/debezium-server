@@ -5,13 +5,13 @@
  */
 package io.debezium.server.cratedb;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.server.DebeziumServer;
 import io.debezium.server.events.ConnectorCompletedEvent;
 import io.debezium.server.events.ConnectorStartedEvent;
-import io.debezium.server.events.TaskStartedEvent;
 import io.debezium.util.Testing;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -84,10 +84,6 @@ public class CrateDBIT {
         }
     }
 
-    void taskStarted(@Observes TaskStartedEvent event) throws Exception {
-        LOGGER.info("Starting task {}", event);
-    }
-
     @Test
     void testConfigIsCorrect() {
         // This is mostly sanity check, if by any chance core or upstream component
@@ -142,7 +138,7 @@ public class CrateDBIT {
     }
 
     @Test
-    void testInsertsAndDeletes() {
+    void testInsertsAndDeletes() throws SQLException, JsonProcessingException {
         Testing.Print.enable();
 
         Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
@@ -202,7 +198,7 @@ public class CrateDBIT {
             connection.close();
 
             // And finally check the state
-            assertThat(resultPostgres).usingRecursiveAssertion().isEqualTo(Arrays.asList(
+            var expectedPostgresState = Arrays.asList(
                     new HashMap<String, Object>() {{
                         put("descr", "hello 2");
                         put("id", 2);
@@ -233,7 +229,8 @@ public class CrateDBIT {
                         put("id", 8);
                         put("new_col", List.of(1.1f, 2.2f, 3.3f));
                     }}
-            ));
+            );
+            assertThat(resultPostgres).usingRecursiveAssertion().isEqualTo(expectedPostgresState);
 
             // Let's proceed with CrateDB
             Statement stmt = conn.createStatement();
@@ -241,21 +238,17 @@ public class CrateDBIT {
             // Let's give some time to propagate the changes
             // First let's refresh the table that should be created by consumer
             // IF this step fails, most likely, consumer haven't process any events
-            Awaitility.await().
-                    atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).
-                    until(() -> {
-                        try {
-                            stmt.execute("REFRESH TABLE testc_inventory_cratedb_test;");
-                            var result = stmt.executeQuery("SELECT COUNT(1) FROM testc_inventory_cratedb_test");
-                            result.next();
-                            return result.getInt(1) > 0;
-                        }
-                        catch (SQLException e) {
-                            LOGGER.debug("fail availing = {}", e.getMessage());
-                            return false;
-                        }
-                    });
-
+            Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
+                try {
+                    stmt.execute("REFRESH TABLE testc_inventory_cratedb_test;");
+                    var result = stmt.executeQuery("SELECT COUNT(1) FROM testc_inventory_cratedb_test");
+                    result.next();
+                    return result.getInt(1) == expectedPostgresState.size();
+                }
+                catch (SQLException e) {
+                    return false;
+                }
+            });
 
             List<Object> results = new ArrayList<>();
             ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_cratedb_test ORDER BY id ASC;");
