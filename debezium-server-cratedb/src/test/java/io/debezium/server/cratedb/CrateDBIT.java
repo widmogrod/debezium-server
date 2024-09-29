@@ -5,30 +5,7 @@
  */
 package io.debezium.server.cratedb;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-import jakarta.enterprise.event.Observes;
-import jakarta.inject.Inject;
-
-import org.awaitility.Awaitility;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.server.DebeziumServer;
@@ -38,6 +15,29 @@ import io.debezium.server.events.TaskStartedEvent;
 import io.debezium.util.Testing;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Integration test that verifies basic reading from PostgreSQL database and writing to CrateDB stream.
@@ -154,64 +154,111 @@ public class CrateDBIT {
             connection.execute("INSERT INTO inventory.cratedb_test VALUES (3, 'hello 3')");
             connection.execute("DELETE FROM inventory.cratedb_test WHERE id=1");
             connection.execute("UPDATE inventory.cratedb_test SET descr = 'hello 33' WHERE id=3");
-            // schema changes
+            // schema changes, let's try to mess up data
+            // 1. we add new column
             connection.execute("ALTER TABLE inventory.cratedb_test ADD COLUMN new_col TEXT DEFAULT 'new description '");
             connection.execute("INSERT INTO inventory.cratedb_test (id, descr, new_col) VALUES (4, 'hello 4', 'new data')");
             connection.execute("INSERT INTO inventory.cratedb_test (id, descr) VALUES (5, 'hello 5')");
-            connection.execute("ALTER TABLE inventory.cratedb_test DROP COLUMN new_col");
-            connection.execute("ALTER TABLE inventory.cratedb_test RENAME COLUMN descr TO description");
-            connection.execute("INSERT INTO inventory.cratedb_test (id, description) VALUES (6, '666')");
-            connection.execute(
-                    "ALTER TABLE inventory.cratedb_test ALTER COLUMN description TYPE INT USING CASE WHEN description ~ '^[0-9]+$' THEN description::integer ELSE NULL END");
-            connection.execute("INSERT INTO inventory.cratedb_test (id, description) VALUES (7, 7)");
+            // 4. let's change type of new_col from string to int
+            connection.execute("ALTER TABLE inventory.cratedb_test ALTER COLUMN new_col DROP DEFAULT;");
+            connection.execute("ALTER TABLE inventory.cratedb_test ALTER COLUMN new_col TYPE INT USING CASE WHEN new_col ~ '^[0-9]+$' THEN new_col::integer ELSE NULL END");
+            connection.execute("INSERT INTO inventory.cratedb_test (id, new_col) VALUES (7, 7)");
+            // 6. let's change new_col to FLOAT[]
+            connection.execute("""
+                    ALTER TABLE inventory.cratedb_test ALTER COLUMN new_col TYPE FLOAT[] USING
+                             CASE
+                                 WHEN new_col IS NOT NULL THEN ARRAY[new_col::float]  -- Convert existing non-null values into float arrays
+                                 ELSE NULL  -- Set NULL for invalid or null data
+                             END;
+                    """);
+            connection.execute("INSERT INTO inventory.cratedb_test (id, new_col) VALUES (8, '{1.1, 2.2, 3.3}')");
 
-            LOGGER.info("SHOW TABLES in Postgres:");
-            Thread.sleep(3000);
-            connection.query("SELECT\n" +
-                    "    table_schema || '.' || table_name\n" +
-                    "FROM\n" +
-                    "    information_schema.tables\n" +
-                    "WHERE\n" +
-                    "    table_type = 'BASE TABLE'\n" +
-                    "AND\n" +
-                    "    table_schema NOT IN ('pg_catalog', 'information_schema');", new JdbcConnection.ResultSetConsumer() {
-                        @Override
-                        public void accept(ResultSet rs) throws SQLException {
-                            while (rs.next()) {
-                                LOGGER.info("Table {}", rs.getString(1));
-                            }
-                        }
-                    });
-
-            LOGGER.info("PostgresSQL table state:");
+            // Assert postgresql final state is as expected
+            List<Object> resultPostgres = new ArrayList<>();
             connection.query("SELECT * FROM inventory.cratedb_test", new JdbcConnection.ResultSetConsumer() {
                 @Override
                 public void accept(ResultSet rs) throws SQLException {
+                    // Gather all the table data
                     while (rs.next()) {
-                        LOGGER.info("Row: {} {}", rs.getObject(1), rs.getString(2));
+                        var id = rs.getInt("id");
+                        var descr = rs.getString("descr");
+                        var newColArray = rs.getArray("new_col");
+                        List<Float> newCol = null;
+                        if (newColArray != null) {
+                            Double[] doubleArray = (Double[]) newColArray.getArray();
+                            newCol = Arrays.stream(doubleArray)
+                                    .map(Double::floatValue)
+                                    .collect(Collectors.toList());
+                        }
+
+                        var record = new HashMap<String, Object>();
+                        record.put("id", id);
+                        record.put("descr", descr);
+                        record.put("new_col", newCol);
+                        resultPostgres.add(record);
                     }
                 }
             });
-
             connection.close();
 
+            // And finally check the state
+            assertThat(resultPostgres).usingRecursiveAssertion().isEqualTo(Arrays.asList(
+                    new HashMap<String, Object>() {{
+                        put("descr", "hello 2");
+                        put("id", 2);
+                        put("new_col", null);
+                    }},
+                    new HashMap<String, Object>() {{
+                        put("descr", "hello 33");
+                        put("id", 3);
+                        put("new_col", null);
+                    }},
+                    new HashMap<String, Object>() {{
+                        put("descr", "hello 4");
+                        put("id", 4);
+                        put("new_col", null);
+                    }},
+                    new HashMap<String, Object>() {{
+                        put("descr", "hello 5");
+                        put("id", 5);
+                        put("new_col", null);
+                    }},
+                    new HashMap<String, Object>() {{
+                        put("descr", null);
+                        put("id", 7);
+                        put("new_col", List.of(7f));
+                    }},
+                    new HashMap<String, Object>() {{
+                        put("descr", null);
+                        put("id", 8);
+                        put("new_col", List.of(1.1f, 2.2f, 3.3f));
+                    }}
+            ));
+
+            // Let's proceed with CrateDB
             Statement stmt = conn.createStatement();
 
-            Thread.sleep(3000);
-            ResultSet tablesSet = stmt.executeQuery("SHOW TABLES");
-            LOGGER.info("SHOW TABLES in CrateDB:");
-            while (tablesSet.next()) {
-                LOGGER.info("{}", tablesSet.getString(1));
-            }
-            tablesSet.close();
+            // Let's give some time to propagate the changes
+            // First let's refresh the table that should be created by consumer
+            // IF this step fails, most likely, consumer haven't process any events
+            Awaitility.await().
+                    atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).
+                    until(() -> {
+                        try {
+                            stmt.execute("REFRESH TABLE testc_inventory_cratedb_test;");
+                            var result = stmt.executeQuery("SELECT COUNT(1) FROM testc_inventory_cratedb_test");
+                            result.next();
+                            return result.getInt(1) > 0;
+                        }
+                        catch (SQLException e) {
+                            LOGGER.debug("fail availing = {}", e.getMessage());
+                            return false;
+                        }
+                    });
 
-            LOGGER.info("REFRESH!");
-            stmt.execute("REFRESH TABLE testc_inventory_cratedb_test;");
-
-            LOGGER.info("SELECT * FROM testc_inventory_cratedb_test;");
-            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_cratedb_test ORDER BY id ASC;");
 
             List<Object> results = new ArrayList<>();
+            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_cratedb_test ORDER BY id ASC;");
             while (itemsSet.next()) {
                 String id = itemsSet.getString(1);
                 String docJson = itemsSet.getString(2);
@@ -223,12 +270,52 @@ public class CrateDBIT {
             // TODO: figure out how to include schema changes
             // current Debezium settings don't stream schema changes
             // and CrateDB don't have some of the operations like change type of a column
-            List<Map<String, Object>> expectedResults = List.of(
-                    Map.of("id", "\"2\"", "doc", Map.of("descr", "hello 2", "id", 2)),
-                    Map.of("id", "\"3\"", "doc", Map.of("descr", "hello 33", "id", 3)),
-                    Map.of("id", "\"4\"", "doc", Map.of("descr", "hello 4", "new_col", "new data", "id", 4)),
-                    Map.of("id", "\"5\"", "doc", Map.of("descr", "hello 5", "new_col", "new description ", "id", 5)),
-                    Map.of("id", "\"7\"", "doc", Map.of("description", 7, "id", 7)));
+            List<HashMap<String, Object>> expectedResults = new ArrayList<>() {{
+                add(new HashMap<>() {{
+                    put("id", "\"2\"");
+                    put("doc", new HashMap<>() {{
+                        put("descr", "hello 2");
+                        put("id", 2);
+                    }});
+                }});
+                add(new HashMap<>() {{
+                    put("id", "\"3\"");
+                    put("doc", new HashMap<>() {{
+                        put("descr", "hello 33");
+                        put("id", 3);
+                    }});
+                }});
+                add(new HashMap<>() {{
+                    put("id", "\"4\"");
+                    put("doc", new HashMap<>() {{
+                        put("descr", "hello 4");
+                        put("id", 4);
+                        put("new_col", "new data");
+                    }});
+                }});
+                add(new HashMap<>() {{
+                    put("id", "\"5\"");
+                    put("doc", new HashMap<>() {{
+                        put("descr", "hello 5");
+                        put("id", 5);
+                        put("new_col", "new description ");
+                    }});
+                }});
+                add(new HashMap<>() {{
+                    put("id", "\"7\"");
+                    put("doc", new HashMap<>() {{
+                        put("id", 7);
+                        put("new_col", "7");
+                    }});
+                }});
+                add(new HashMap<>() {{
+                    put("id", "\"8\"");
+                    put("doc", new HashMap<>() {{
+                        put("id", 8);
+                        put("new_col", "[1.1, 2.2, 3.3]");
+                    }});
+                }});
+            }};
 
             assertThat(results).usingRecursiveComparison().isEqualTo(expectedResults);
 
