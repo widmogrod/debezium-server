@@ -5,13 +5,16 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import static io.debezium.server.cratedb.schema.Evolution.fromObject;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.jupiter.api.Test;
+import static io.debezium.server.cratedb.schema.Evolution.fromObject;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 class SchemaTest {
     @Test
@@ -143,5 +146,77 @@ class SchemaTest {
                                 Schema.Primitive.BIGINT,
                                 Schema.Primitive.BOOLEAN,
                                 Schema.Primitive.TEXT))));
+    }
+
+    @Test
+    void testTypeSuffix() throws JsonProcessingException {
+        var schema0 = Schema.Dict.of();
+        var object0 = new HashMap<String, Object>() {{
+            put("id", 8);
+            put("descr", null);
+            put("new_col", "hello world");
+        }};
+
+        var result = fromObject(schema0, object0);
+        var schema1 = result.getLeft();
+        var object00 = result.getRight();
+        assertThat(schema1).isEqualTo(Schema.Dict.of(
+                "id", Schema.Primitive.BIGINT,
+                "new_col", Schema.Primitive.TEXT
+        ));
+        assertThat(object00).usingRecursiveAssertion().isEqualTo(new HashMap<String, Object>() {{
+            put("id", 8);
+            put("new_col", "hello world");
+        }});
+
+        var object1 = new HashMap<String, Object>() {{
+            put("id", 8);
+            put("descr", null);
+            put("new_col", 88);
+        }};
+        var result2 = fromObject(schema1, object1);
+        var schema2 = result2.getLeft();
+        var object11 = result2.getRight();
+
+        assertThat(schema2).isEqualTo(Schema.Dict.of(
+                "id", Schema.Primitive.BIGINT,
+                "new_col", Schema.Coli.of(
+                        Schema.Primitive.TEXT,
+                        Schema.Primitive.BIGINT
+                )
+        ));
+        assertThat(object11).usingRecursiveAssertion().isEqualTo(new HashMap<String, Object>() {{
+            put("id", 8);
+            put("new_col", PartialValue.of("88", 88));
+        }});
+
+        var json11 = new ObjectMapper().writeValueAsString(object11);
+        assertThat(json11).isEqualTo("{\"new_col\":\"88\",\"id\":8}");
+
+        var object2 = new HashMap<String, Object>() {{
+            put("id", 8);
+            put("descr", null);
+            put("new_col", List.of(1.1, 2.2, 3.3));
+        }};
+        var result3 = fromObject(schema2, object2);
+        var schema3 = result3.getLeft();
+        var object22 = result3.getRight();
+
+        assertThat(schema3).isEqualTo(Schema.Dict.of(
+                "id", Schema.Primitive.BIGINT,
+                "new_col", Schema.Coli.of(
+                        Schema.Primitive.TEXT,
+                        Schema.Primitive.BIGINT,
+                        Schema.Array.of(Schema.Primitive.DOUBLE
+                        )
+                )
+        ));
+        assertThat(object22).usingRecursiveAssertion().isEqualTo(new HashMap<String, Object>() {{
+            put("id", 8);
+            put("new_col", PartialValue.of("[1.1, 2.2, 3.3]", List.of(1.1, 2.2, 3.3)));
+        }});
+
+        var json22 = new ObjectMapper().writeValueAsString(object22);
+        assertThat(json22).isEqualTo("{\"new_col\":\"[1.1, 2.2, 3.3]\",\"id\":8}");
     }
 }
