@@ -20,15 +20,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,11 +33,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.server.DebeziumServer;
-import io.debezium.server.events.ConnectorCompletedEvent;
-import io.debezium.server.events.ConnectorStartedEvent;
 import io.debezium.util.Testing;
-import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
 
 /**
  * Integration test that verifies basic reading from PostgresSQL database and writing to CrateDB stream.
@@ -48,20 +43,12 @@ import io.quarkus.test.junit.QuarkusTest;
  * @author Gabriel habryn
  */
 @QuarkusTest
-@QuarkusTestResource(PostgresTestResourceLifecycleManager.class)
-@QuarkusTestResource(CrateTestResourceLifecycleManager.class)
+@TestProfile(Profile.PostgresAndCrateDB.class)
 public class PostgresCrateDBIT {
-    private static final Logger LOGGER = LoggerFactory.getLogger(PostgresCrateDBIT.class);
-
     private static Connection conn;
 
     @Inject
     DebeziumServer server;
-
-    {
-        Testing.Files.delete(CrateDBTestConfigSource.OFFSET_STORE_PATH);
-        Testing.Files.createTestingFile(CrateDBTestConfigSource.OFFSET_STORE_PATH);
-    }
 
     @BeforeEach
     void setup() throws Exception {
@@ -77,16 +64,6 @@ public class PostgresCrateDBIT {
         }
     }
 
-    void setupDependencies(@Observes ConnectorStartedEvent event) throws Exception {
-        conn = DriverManager.getConnection(CrateTestResourceLifecycleManager.getUrl());
-    }
-
-    void connectorCompleted(@Observes ConnectorCompletedEvent event) throws Exception {
-        if (!event.isSuccess()) {
-            throw (Exception) event.getError().get();
-        }
-    }
-
     @Test
     void testConfigIsCorrect() {
         // This is mostly sanity check, if by any chance core or upstream component
@@ -95,13 +72,10 @@ public class PostgresCrateDBIT {
         var props = server.getProps();
         assertThat(props).containsEntry("connector.class", "io.debezium.connector.postgresql.PostgresConnector")
                 .containsEntry("name", "cratedb")
-                // .containsEntry("file", CrateDBTestConfigSource.TEST_FILE_PATH.toString())
-                // .containsEntry("offset.storage.file.filename", CrateDBTestConfigSource.OFFSET_STORE_PATH.toString())
+                .containsEntry("offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
                 .containsEntry("schema.include.list", "inventory")
                 .containsEntry("table.include.list", "inventory.customers, inventory.cratedb_test")
                 .containsEntry("transforms", "addheader")
-                // .containsEntry("transforms.hoist.type", "org.apache.kafka.connect.transforms.HoistField$Value")
-                // .containsEntry("transforms.hoist.field", "payload")
                 .containsEntry("offset.storage.cratedb.connection_url", CrateTestResourceLifecycleManager.getUrl());
     }
 
@@ -117,7 +91,7 @@ public class PostgresCrateDBIT {
 
         Statement stmt = conn.createStatement();
 
-        Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
+        Awaitility.await().atMost(Duration.ofSeconds(Profile.waitForSeconds())).until(() -> {
             try {
                 stmt.execute("REFRESH TABLE testc_inventory_customers;");
                 var result = stmt.executeQuery("SELECT COUNT(1) FROM testc_inventory_customers");
@@ -148,7 +122,7 @@ public class PostgresCrateDBIT {
     void testPostgresCustomTableAndInsertsAndDeletes() throws SQLException, JsonProcessingException {
         Testing.Print.enable();
 
-        Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
+        Awaitility.await().atMost(Duration.ofSeconds(Profile.waitForSeconds())).until(() -> {
             // NOTE: Running this code inside await ensures that Debezium sees those changes as CDC events, and not as snapshot (reads)
             // which makes more accurate representation of how CrateDB state will look after all those operations
             final PostgresConnection connection = PostgresTestResourceLifecycleManager.getPostgresConnection();
@@ -259,7 +233,7 @@ public class PostgresCrateDBIT {
             // Let's give some time to propagate the changes
             // First let's refresh the table that should be created by consumer
             // IF this step fails, most likely, consumer haven't process any events
-            Awaitility.await().atMost(Duration.ofSeconds(CrateDBTestConfigSource.waitForSeconds())).until(() -> {
+            Awaitility.await().atMost(Duration.ofSeconds(Profile.waitForSeconds())).until(() -> {
                 try {
                     stmt.execute("REFRESH TABLE testc_inventory_cratedb_test;");
                     var result = stmt.executeQuery("SELECT COUNT(1) FROM testc_inventory_cratedb_test");

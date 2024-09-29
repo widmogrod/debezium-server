@@ -19,8 +19,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.debezium.server.cratedb.CrateTestResourceLifecycleManager;
-import io.quarkus.test.common.QuarkusTestResource;
+import io.debezium.server.cratedb.Profile;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
 
 /**
  * Integration test validating CrateDB behavior under certain conditions.
@@ -28,7 +29,7 @@ import io.quarkus.test.junit.QuarkusTest;
  * @author Gabriel Habryn
  */
 @QuarkusTest
-@QuarkusTestResource(CrateTestResourceLifecycleManager.class)
+@TestProfile(Profile.PostgresAndCrateDB.class)
 class InformationSchemaLoaderTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(InformationSchemaLoaderTest.class);
 

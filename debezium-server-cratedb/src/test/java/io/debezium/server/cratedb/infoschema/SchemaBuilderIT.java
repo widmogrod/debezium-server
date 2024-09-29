@@ -23,15 +23,16 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.debezium.server.cratedb.CrateTestResourceLifecycleManager;
+import io.debezium.server.cratedb.Profile;
 import io.debezium.server.cratedb.datagen.DataGen;
 import io.debezium.server.cratedb.schema.CrateSQL;
 import io.debezium.server.cratedb.schema.Evolution;
 import io.debezium.server.cratedb.schema.Schema;
-import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
 
 @QuarkusTest
-@QuarkusTestResource(CrateTestResourceLifecycleManager.class)
+@TestProfile(Profile.PostgresAndCrateDB.class)
 class SchemaBuilderIT {
     private static final Logger LOGGER = LoggerFactory.getLogger(InformationSchemaLoaderTest.class);
 

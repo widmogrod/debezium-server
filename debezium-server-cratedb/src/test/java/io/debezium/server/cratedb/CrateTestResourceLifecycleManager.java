@@ -53,10 +53,6 @@ public class CrateTestResourceLifecycleManager implements QuarkusTestResourceLif
         container.start();
         Map<String, String> params = new ConcurrentHashMap();
         params.put("debezium.sink.cratedb.connection_url", getUrl());
-        params.put("debezium.source.schema.include.list", "inventory");
-        params.put("debezium.source.table.include.list", "inventory.customers,inventory.cratedb_test");
-
-        LOGGER.info("CrateTestResourceLifecycleManager started with params: {}", params);
         return params;
     }
 

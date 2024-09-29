@@ -40,8 +40,8 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.debezium.server.cratedb.infoschema.DataLoader;
-import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
 
 /**
  * Integration test validating CrateDB behavior under certain conditions.
@@ -49,7 +49,7 @@ import io.quarkus.test.junit.QuarkusTest;
  * @author Gabriel Habryn
  */
 @QuarkusTest
-@QuarkusTestResource(CrateTestResourceLifecycleManager.class)
+@TestProfile(Profile.PostgresAndCrateDB.class)
 public class CrateExperiments {
     private static final Logger LOGGER = LoggerFactory.getLogger(CrateExperiments.class);
 
