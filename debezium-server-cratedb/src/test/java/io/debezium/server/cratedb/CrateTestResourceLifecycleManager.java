@@ -23,7 +23,7 @@ import io.quarkus.test.common.QuarkusTestResourceLifecycleManager;
 public class CrateTestResourceLifecycleManager implements QuarkusTestResourceLifecycleManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(CrateTestResourceLifecycleManager.class);
 
-    public static final String CRATEDB_IMAGE = "library/crate:5.8.1";
+    public static final String CRATEDB_IMAGE = "library/crate:5.8.3";
     public static final Integer CRATEDB_PORT = 5432;
 
     // ISSUE jdbc:crate:// does not work as documented
