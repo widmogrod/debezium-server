@@ -17,6 +17,7 @@ import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -140,11 +141,11 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         LOGGER.info("handleBatch of size {}", records.size());
 
         // Deduplicate records by tableId and recordId leave only the latest record.
-        Map<String, Map<String, ChangeEvent<Object, Object>>> recordMap = new HashMap<>();
+        Map<String, Map<String, ChangeEvent<Object, Object>>> recordMap = new LinkedHashMap<>();
         for (ChangeEvent<Object, Object> record : records) {
             String tableId = getTableId(record);
             String recordId = getRecordId(record);
-            recordMap.computeIfAbsent(tableId, k -> new HashMap<>()).put(recordId, record);
+            recordMap.computeIfAbsent(tableId, k -> new LinkedHashMap<>()).put(recordId, record);
         }
 
         // Process the records per each table
@@ -164,6 +165,8 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 try {
                     var columns = DataLoader.withTableName(tableId).load(conn);
                     schema0 = SchemaBuilder.fromInformationSchema(columns);
+                    var subElement = Evolution.fromPath(List.of("doc"), schema0);
+                    schema0 = subElement.orElseGet(Schema.Dict::of);
                 }
                 catch (Exception e) {
                     LOGGER.error("Error while loading table {}", tableId, e);
@@ -184,21 +187,19 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                     operation = payload.getOp();
                 }
                 else {
-                    LOGGER.error("Payload {}", payload);
-                    LOGGER.error("record={}", record);
+                    LOGGER.debug("handleBatch(unknown): record={}", record);
                     operation = "unknown";
                 }
 
                 try {
                     switch (operation) {
-                        case "r":
-                        case "c":
-                        case "u":
+                        case "c", "r", "u":
                             var object0 = payload.getAfter();
                             var result = Evolution.fromObject(schema0, object0);
                             var schema1 = result.getLeft();
-                            var object1 = payload.getAfter();
+                            var object1 = result.getRight();
                             // update what we learn about schema
+                            schema0 = schema1;
                             tablesSchema.put(tableId, schema1);
                             // use final representation of object as something we will insert into database
                             String recordDoc = getRecordDoc(object1);
