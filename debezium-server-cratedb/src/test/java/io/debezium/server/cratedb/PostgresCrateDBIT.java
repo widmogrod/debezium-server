@@ -50,8 +50,8 @@ import io.quarkus.test.junit.QuarkusTest;
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResourceLifecycleManager.class)
 @QuarkusTestResource(CrateTestResourceLifecycleManager.class)
-public class CrateDBIT {
-    private static final Logger LOGGER = LoggerFactory.getLogger(CrateDBIT.class);
+public class PostgresCrateDBIT {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PostgresCrateDBIT.class);
 
     private static Connection conn;
 
