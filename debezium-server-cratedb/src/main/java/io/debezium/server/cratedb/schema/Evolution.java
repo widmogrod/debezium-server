@@ -5,9 +5,18 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import java.util.*;
-
 import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Implementation of the schema evolution for CrateDB
@@ -21,37 +30,25 @@ public class Evolution {
         }
 
         return switch (object) {
+            case Long ignored -> switch (schema) {
+                case Schema.Primitive.BIGINT -> Pair.of(schema, object);
+                default -> fallbackToTryCast(schema, object);
+            };
             case Integer ignored -> switch (schema) {
                 case Schema.Primitive.BIGINT -> Pair.of(schema, object);
-                default -> {
-                    var finalSchema = merge(schema, detectType(object));
-                    var finalValue = tryCast(object, finalSchema);
-                    yield Pair.of(finalSchema, finalValue);
-                }
+                default -> fallbackToTryCast(schema, object);
             };
             case Double ignored -> switch (schema) {
                 case Schema.Primitive.DOUBLE -> Pair.of(schema, object);
-                default -> {
-                    var finalSchema = merge(schema, detectType(object));
-                    var finalValue = tryCast(object, finalSchema);
-                    yield Pair.of(finalSchema, finalValue);
-                }
+                default -> fallbackToTryCast(schema, object);
             };
             case String ignored -> switch (schema) {
                 case Schema.Primitive.TEXT -> Pair.of(schema, object);
-                default -> {
-                    var finalSchema = merge(schema, detectType(object));
-                    var finalValue = tryCast(object, finalSchema);
-                    yield Pair.of(finalSchema, finalValue);
-                }
+                default -> fallbackToTryCast(schema, object);
             };
             case Boolean ignored -> switch (schema) {
                 case Schema.Primitive.BOOLEAN -> Pair.of(schema, object);
-                default -> {
-                    var finalSchema = merge(schema, detectType(object));
-                    var finalValue = tryCast(object, finalSchema);
-                    yield Pair.of(finalSchema, finalValue);
-                }
+                default -> fallbackToTryCast(schema, object);
             };
 
             case List list -> switch (schema) {
@@ -90,11 +87,7 @@ public class Evolution {
 
                     yield Pair.of(finalType, finalResult);
                 }
-                default -> {
-                    var finalSchema = merge(schema, detectType(object));
-                    var finalValue = tryCast(object, finalSchema);
-                    yield Pair.of(finalSchema, finalValue);
-                }
+                default -> fallbackToTryCast(schema, object);
             };
 
             case Map x -> switch (schema) {
@@ -146,17 +139,19 @@ public class Evolution {
 
                     yield Pair.of(Schema.Dict.of(fields), object2);
                 }
-                default -> {
-                    var finalSchema = merge(schema, detectType(object));
-                    var finalValue = tryCast(object, finalSchema);
-                    yield Pair.of(finalSchema, finalValue);
-                }
+                default -> fallbackToTryCast(schema, object);
             };
 
             default -> throw new IllegalArgumentException(
                     "Unknown object match (%s, %s)"
                             .formatted(schema.getClass(), object.getClass()));
         };
+    }
+
+    private static Pair<Schema.I, Object> fallbackToTryCast(Schema.I schema, Object object) {
+        var finalSchema = merge(schema, detectType(object));
+        var finalValue = tryCast(object, finalSchema);
+        return Pair.of(finalSchema, finalValue);
     }
 
     public static Object tryCast(Object value, Schema.I type) {
@@ -314,7 +309,8 @@ public class Evolution {
                     for (var entry : setA) {
                         if (entry instanceof Schema.Dict) {
                             set.add(merge(entry, dict));
-                        } else {
+                        }
+                        else {
                             set.add(entry);
                         }
                     }
@@ -418,6 +414,7 @@ public class Evolution {
         return switch (fieldValue) {
             case String ignored -> Schema.Primitive.TEXT;
             case Integer ignored -> Schema.Primitive.BIGINT;
+            case Long ignored -> Schema.Primitive.BIGINT;
             case Double ignored -> Schema.Primitive.DOUBLE;
             case Boolean ignored -> Schema.Primitive.BOOLEAN;
             case List of -> Schema.Array.of(of.isEmpty() ? Schema.Primitive.NULL : detectType(of.getFirst()));
@@ -537,7 +534,7 @@ public class Evolution {
                 if (!fieldsB.containsKey(aKey)) {
                     // but if aValue is collision, tolerate it
                     if (aValue instanceof Schema.Coli ||
-                            (aValue instanceof Schema.Array arr && arr.innerType() instanceof Schema.Coli)) {
+                        (aValue instanceof Schema.Array arr && arr.innerType() instanceof Schema.Coli)) {
                         return true;
                     }
                     return false;
