@@ -82,7 +82,10 @@ public class PostgresCrateDBIT {
                 .containsEntry("offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
                 .containsEntry("schema.include.list", "inventory")
                 .containsEntry("table.include.list", "inventory.customers, inventory.cratedb_test")
-                .containsEntry("transforms", "addheader")
+                .containsEntry("transforms", "unwrap")
+                .containsEntry("transforms.unwrap.type", "io.debezium.transforms.ExtractNewRecordState")
+                .containsEntry("transforms.unwrap.add.headers", "op")
+                .containsEntry("transforms.unwrap.drop.tombstones", "false")
                 .containsEntry("offset.storage.cratedb.connection_url", CrateTestResourceLifecycleManager.getUrl());
     }
 
@@ -91,10 +94,10 @@ public class PostgresCrateDBIT {
         Testing.Print.enable();
 
         List<Map<String, Object>> expectedResults = List.of(
-                Map.of("id", "\"1001\"", "doc", Map.of("last_name", "Thomas", "id", 1001, "first_name", "Sally", "email", "sally.thomas@acme.com")),
-                Map.of("id", "\"1002\"", "doc", Map.of("last_name", "Bailey", "id", 1002, "first_name", "George", "email", "gbailey@foobar.com")),
-                Map.of("id", "\"1003\"", "doc", Map.of("last_name", "Walker", "id", 1003, "first_name", "Edward", "email", "ed@walker.com")),
-                Map.of("id", "\"1004\"", "doc", Map.of("last_name", "Kretchmar", "id", 1004, "first_name", "Anne", "email", "annek@noanswer.org")));
+                Map.of("id", "1001", "doc", Map.of("last_name", "Thomas", "id", 1001, "first_name", "Sally", "email", "sally.thomas@acme.com")),
+                Map.of("id", "1002", "doc", Map.of("last_name", "Bailey", "id", 1002, "first_name", "George", "email", "gbailey@foobar.com")),
+                Map.of("id", "1003", "doc", Map.of("last_name", "Walker", "id", 1003, "first_name", "Edward", "email", "ed@walker.com")),
+                Map.of("id", "1004", "doc", Map.of("last_name", "Kretchmar", "id", 1004, "first_name", "Anne", "email", "annek@noanswer.org")));
 
         Statement stmt = conn.createStatement();
 
@@ -270,7 +273,7 @@ public class PostgresCrateDBIT {
                 {
                     add(new HashMap<>() {
                         {
-                            put("id", "\"2\"");
+                            put("id", "2");
                             put("doc", new HashMap<>() {
                                 {
                                     put("descr", "hello 2");
@@ -281,7 +284,7 @@ public class PostgresCrateDBIT {
                     });
                     add(new HashMap<>() {
                         {
-                            put("id", "\"3\"");
+                            put("id", "3");
                             put("doc", new HashMap<>() {
                                 {
                                     put("descr", "hello 33");
@@ -292,7 +295,7 @@ public class PostgresCrateDBIT {
                     });
                     add(new HashMap<>() {
                         {
-                            put("id", "\"4\"");
+                            put("id", "4");
                             put("doc", new HashMap<>() {
                                 {
                                     put("descr", "hello 4");
@@ -304,7 +307,7 @@ public class PostgresCrateDBIT {
                     });
                     add(new HashMap<>() {
                         {
-                            put("id", "\"5\"");
+                            put("id", "5");
                             put("doc", new HashMap<>() {
                                 {
                                     put("descr", "hello 5");
@@ -316,7 +319,7 @@ public class PostgresCrateDBIT {
                     });
                     add(new HashMap<>() {
                         {
-                            put("id", "\"7\"");
+                            put("id", "7");
                             put("doc", new HashMap<>() {
                                 {
                                     put("id", 7);
@@ -327,7 +330,7 @@ public class PostgresCrateDBIT {
                     });
                     add(new HashMap<>() {
                         {
-                            put("id", "\"8\"");
+                            put("id", "8");
                             put("doc", new HashMap<>() {
                                 {
                                     put("id", 8);
@@ -556,7 +559,7 @@ public class PostgresCrateDBIT {
                             put("json_value", "{\"key\": \"value\"}");
                             put("jsonb_value", "{\"key\": \"value\"}");
                             put("xml_value", "<tag>Example XML</tag>");
-                            put("array_value", new Integer[]{1, 2, 3});
+                            put("array_value", new Integer[]{ 1, 2, 3 });
                             put("hstore_value", "\"key\"=>\"value\"");
                             put("inet_value", "192.168.1.1");
                             put("cidr_value", "192.168.100.128/25");
@@ -571,8 +574,7 @@ public class PostgresCrateDBIT {
                             put("polygon_value", "((0,0),(1,1),(1,0),(0,0))");
                             put("circle_value", "<(0,0),5>");
                         }
-                    }
-            );
+                    });
             assertThat(resultPostgres).usingRecursiveComparison().isEqualTo(expectedPostgresState);
 
             // Let's proceed with CrateDB
@@ -610,7 +612,7 @@ public class PostgresCrateDBIT {
                 {
                     add(new HashMap<>() {
                         {
-                            put("id", "\"1\"");
+                            put("id", "1");
                             put("doc", new HashMap<String, Object>() {
                                 {
                                     put("serial_id", 1);

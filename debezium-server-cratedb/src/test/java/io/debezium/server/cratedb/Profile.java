@@ -28,10 +28,10 @@ public class Profile {
             // Other params from CrateTestResourceLifecycleManager:
             // - "debezium.sink.cratedb.connection_url"
 
-            params.put("debezium.transforms", "addheader");
-            params.put("debezium.transforms.addheader.type", "org.apache.kafka.connect.transforms.InsertHeader");
-            params.put("debezium.transforms.addheader.header", "headerKey");
-            params.put("debezium.transforms.addheader.value.literal", "headerValue");
+            params.put("debezium.transforms", "unwrap");
+            params.put("debezium.transforms.unwrap.type", "io.debezium.transforms.ExtractNewRecordState");
+            params.put("debezium.transforms.unwrap.add.headers", "op");
+            params.put("debezium.transforms.unwrap.drop.tombstones", "false");
 
             // Other params like username, port, etc be taken from PostgresTestResourceLifecycleManager
             // - "debezium.source.database.user"
