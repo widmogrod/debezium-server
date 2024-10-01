@@ -49,6 +49,16 @@ public class Profile {
             params.put("debezium.source.schema.include.list", "inventory");
             params.put("debezium.source.table.include.list", "inventory.customers,inventory.cratedb_test");
 
+            // CrateDB sink can infer schema on it's own
+            // no need to send schema information
+            params.put("debezium.format.schemas.enable", "false");
+            params.put("debezium.format.header.schemas.enable", "false");
+            params.put("debezium.format.value.schemas.enable", "false");
+
+            // https://debezium.io/documentation/reference/stable/operations/debezium-server.html#debezium-format-configuration-options
+            params.put("debezium.format.key", "json");
+            params.put("debezium.format.value", "json");
+            params.put("debezium.format.header", "json");
             return params;
         }
     }
