@@ -654,7 +654,7 @@ public class PostgresCrateDBIT {
                                         }
                                     });
 
-                                    // FIXME: Debezium didn't sent those values!!
+                                    // NOTE: TableSchemaBuilder: Unexpected JDBC type '1111' for column 'line_value' that will be ignored
                                     // put("point_value", "(1,2)");
                                     // put("line_value", "{1,1,-1}");
                                     // put("lseg_value", "[(0,0),(1,1)]");

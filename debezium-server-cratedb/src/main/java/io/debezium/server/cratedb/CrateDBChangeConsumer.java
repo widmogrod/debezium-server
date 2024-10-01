@@ -182,14 +182,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             for (Map.Entry<String, ChangeEvent<Object, Object>> recordEntry : tableRows) {
                 String recordId = recordEntry.getKey();
                 ChangeEvent<Object, Object> record = recordEntry.getValue();
-
-                String operation = "unknown";
-                for (var header : record.headers()) {
-                    if (Objects.equals(header.getKey(), "__op")) {
-                        operation = header.getValue().toString().replace("\"", "");
-                        break;
-                    }
-                }
+                String operation = getOperationType(record);
 
                 try {
                     switch (operation) {
@@ -304,6 +297,18 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             return str;
         }
         return convertToJson(key);
+    }
+
+    private String getOperationType(ChangeEvent<Object, Object> record) {
+        String operation = "unknown";
+        for (var header : record.headers()) {
+            if (Objects.equals(header.getKey(), "__op")) {
+                var x = serdeKey.deserializer().deserialize("xx", getBytes(header.getValue()));
+                operation = x.replace("\"", "");
+                break;
+            }
+        }
+        return operation;
     }
 
     private String getRecordDoc(Object object) {
