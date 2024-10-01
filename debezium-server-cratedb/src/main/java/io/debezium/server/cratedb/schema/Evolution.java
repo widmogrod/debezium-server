@@ -5,9 +5,8 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import org.apache.commons.lang3.tuple.Pair;
-
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -17,6 +16,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Implementation of the schema evolution for CrateDB
@@ -50,7 +51,10 @@ public class Evolution {
                 case Schema.Primitive.BOOLEAN -> Pair.of(schema, object);
                 default -> fallbackToTryCast(schema, object);
             };
-
+            case Date date -> switch (schema) {
+                case Schema.Primitive.BIGINT -> Pair.of(schema, date.getTime());
+                default -> fallbackToTryCast(schema, object);
+            };
             case List list -> switch (schema) {
                 case Schema.Array schemaList -> {
                     if (list.isEmpty()) {
@@ -417,6 +421,7 @@ public class Evolution {
             case Long ignored -> Schema.Primitive.BIGINT;
             case Double ignored -> Schema.Primitive.DOUBLE;
             case Boolean ignored -> Schema.Primitive.BOOLEAN;
+            case Date ignored -> Schema.Primitive.BIGINT;
             case List of -> Schema.Array.of(of.isEmpty() ? Schema.Primitive.NULL : detectType(of.getFirst()));
             case Map ignored -> Schema.Dict.of();
             case PartialValue(Object ignored, Object original) -> detectType(original);
@@ -534,7 +539,7 @@ public class Evolution {
                 if (!fieldsB.containsKey(aKey)) {
                     // but if aValue is collision, tolerate it
                     if (aValue instanceof Schema.Coli ||
-                        (aValue instanceof Schema.Array arr && arr.innerType() instanceof Schema.Coli)) {
+                            (aValue instanceof Schema.Array arr && arr.innerType() instanceof Schema.Coli)) {
                         return true;
                     }
                     return false;
