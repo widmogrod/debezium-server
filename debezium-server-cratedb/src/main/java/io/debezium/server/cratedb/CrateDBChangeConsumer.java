@@ -18,6 +18,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import jakarta.annotation.PostConstruct;
@@ -142,8 +143,13 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         Map<String, Map<String, ChangeEvent<Object, Object>>> recordMap = new LinkedHashMap<>();
         for (ChangeEvent<Object, Object> record : records) {
             String tableId = getTableId(record);
-            String recordId = getRecordId(record);
-            recordMap.computeIfAbsent(tableId, k -> new LinkedHashMap<>()).put(recordId, record);
+            try {
+                String recordId = getRecordId(record);
+                recordMap.computeIfAbsent(tableId, k -> new LinkedHashMap<>()).put(recordId, record);
+            }
+            catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         // Process the records per each table
@@ -176,24 +182,19 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             for (Map.Entry<String, ChangeEvent<Object, Object>> recordEntry : tableRows) {
                 String recordId = recordEntry.getKey();
                 ChangeEvent<Object, Object> record = recordEntry.getValue();
-                DebeziumMessagePayload payload = getDebeziumMessage(record);
 
-                String operation;
-                if (payload == null) {
-                    operation = "d";
-                }
-                else if (payload.getOp() != null) {
-                    operation = payload.getOp();
-                }
-                else {
-                    LOGGER.debug("handleBatch(unknown): record={}", record);
-                    operation = "unknown";
+                String operation = "unknown";
+                for (var header : record.headers()) {
+                    if (Objects.equals(header.getKey(), "__op")) {
+                        operation = header.getValue().toString().replace("\"", "");
+                        break;
+                    }
                 }
 
                 try {
                     switch (operation) {
                         case "c", "r", "u":
-                            var object0 = payload.getAfter();
+                            var object0 = getRecordObject(record);
                             var result = Evolution.fromObject(schema0, object0);
                             var schema1 = result.getLeft();
                             var object1 = result.getRight();
@@ -226,7 +227,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                             break;
                     }
                 }
-                catch (SQLException e) {
+                catch (SQLException | IOException e) {
                     closeStatements(stmtUpsert, stmtDelete);
                     throw new RuntimeException("Failed in prepare", e);
                 }
@@ -287,36 +288,22 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         }
     }
 
-    private DebeziumMessagePayload getDebeziumMessage(ChangeEvent<Object, Object> record) {
+    private Object getRecordObject(ChangeEvent<Object, Object> record) throws IOException {
         Object value = record.value();
         if (value == null) {
-            return new DebeziumMessagePayload(
-                    "d",
-                    null);
+            return value;
         }
 
         var bytes = getBytes(value);
-
-        try {
-            var message = serdeValue.readValue(bytes, DebeziumMessage.class);
-            if (message == null || message.getPayload() == null) {
-                return serdeValue.readValue(bytes, DebeziumMessagePayload.class);
-            }
-
-            return message.getPayload();
-        }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        return serdeValue.readValue(bytes, Object.class);
     }
 
-    private String getRecordId(ChangeEvent<Object, Object> record) {
-        try {
-            return convertToJson(serdeKey.deserializer().deserialize("xx", getBytes(record.key())));
+    private String getRecordId(ChangeEvent<Object, Object> record) throws JsonProcessingException {
+        var key = serdeKey.deserializer().deserialize("xx", getBytes(record.key()));
+        if (key instanceof String str) {
+            return str;
         }
-        catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
+        return convertToJson(key);
     }
 
     private String getRecordDoc(Object object) {
