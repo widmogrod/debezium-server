@@ -5,19 +5,10 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-
 import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of the schema evolution for CrateDB
@@ -94,14 +85,14 @@ public class Evolution {
                 default -> fallbackToTryCast(schema, object);
             };
 
-            case Map x -> switch (schema) {
+            case Map map -> switch (schema) {
                 case Schema.Dict schema1 -> {
                     var object2 = new LinkedHashMap<>();
                     // immutability wrap:
                     Map<Object, Schema.I> fields = new HashMap<>(schema1.fields());
 
-                    for (var fieldName : x.keySet()) {
-                        var fieldValue = x.get(fieldName);
+                    for (var fieldName : map.keySet()) {
+                        var fieldValue = map.get(fieldName);
 
                         // empty arrays, or null values
                         if (shouldSkipValue(fieldValue)) {
@@ -152,10 +143,51 @@ public class Evolution {
         };
     }
 
-    private static Pair<Schema.I, Object> fallbackToTryCast(Schema.I schema, Object object) {
+    public static Pair<Schema.I, Object> fallbackToTryCast(Schema.I schema, Object object) {
         var finalSchema = merge(schema, detectType(object));
         var finalValue = tryCast(object, finalSchema);
         return Pair.of(finalSchema, finalValue);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static boolean isDebeziumArrayDocument(Map x) {
+        if (x.isEmpty()) {
+            return false;
+        }
+
+        return x.keySet()
+                .stream()
+                .allMatch(key -> key instanceof String str && str.matches("_\\d+"));
+    }
+
+    @SuppressWarnings("unchecked")
+    public static Object dedebeziumArrayDocuments(Object value) {
+        return switch (value) {
+            case null -> null;
+            case Map map -> {
+                if (isDebeziumArrayDocument(map)) {
+                    yield  ((Map<Object, Object>) map).entrySet().stream()
+                            .sorted(Comparator.comparing(entry -> entry.getKey().toString()))
+                            .map((entry) -> dedebeziumArrayDocuments(entry.getValue()))
+                            .collect(Collectors.toList());
+                }
+
+                var result = new LinkedHashMap<>();
+                for (var fieldName : map.keySet()) {
+                    result.put(fieldName, dedebeziumArrayDocuments(map.get(fieldName)));
+                }
+                yield result;
+            }
+            case List list -> {
+                var result = new ArrayList<>();
+                for (var element : list) {
+                    result.add(dedebeziumArrayDocuments(element));
+                }
+                yield result;
+            }
+
+            default -> value;
+        };
     }
 
     public static Object tryCast(Object value, Schema.I type) {
