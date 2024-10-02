@@ -231,8 +231,25 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                     int[] processed = stmtUpsert.executeBatch();
                     for (int i = 0; i < processed.length; i++) {
                         if (processed[i] != 1) {
-                            // FIXME: This is silent failure, allow configuration of this behaviour
-                            LOGGER.warn("Failed to upsert record tableId={} id={} code={}", tableId, tableRows.stream().toList().get(i).getKey(), processed[i]);
+                            var element = tableRows.stream().toList().get(i);
+                            String recordId = element.getKey();
+
+                            try {
+                                var schema00 = tablesSchema.get(tableId);
+                                var object00 = getRecordObject(element.getValue());
+                                var result00 = Evolution.fromObject(schema00, object00);
+                                var recordDoc = getRecordDoc(result00.getRight());
+
+                                String upsert = SQL_UPSERT.formatted(tableId);
+                                var stmt = conn.prepareStatement(upsert);
+                                stmt.setString(1, recordId);
+                                stmt.setString(2, recordDoc);
+                                stmt.execute();
+                            }
+                            catch (SQLException | IOException e) {
+                                LOGGER.warn("Failed  to upsert record tableId={} id={} code={}, exception={}",
+                                        tableId, recordId, processed[i], e.getMessage());
+                            }
                         }
                     }
                 }
@@ -240,8 +257,18 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                     int[] processed = stmtDelete.executeBatch();
                     for (int i = 0; i < processed.length; i++) {
                         if (processed[i] != 1) {
-                            // FIXME: This is silent failure, allow configuration of this behaviour
-                            LOGGER.warn("Failed to delete record tableId={} id={} code={}", tableId, tableRows.stream().toList().get(i).getKey(), processed[i]);
+                            var element = tableRows.stream().toList().get(i);
+                            String recordId = element.getKey();
+                            try {
+                                String delete = SQL_DELETE.formatted(tableId);
+                                var stmt = conn.prepareStatement(delete);
+                                stmt.setString(1, recordId);
+                                stmt.execute();
+                            }
+                            catch (SQLException e) {
+                                LOGGER.warn("Failed to delete record tableId={} id={} code={}, exception={}",
+                                        tableId, recordId, processed[i], e.getMessage());
+                            }
                         }
                     }
                 }
