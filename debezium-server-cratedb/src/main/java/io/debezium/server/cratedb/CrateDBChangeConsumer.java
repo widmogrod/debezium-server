@@ -57,7 +57,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     private static final Logger LOGGER = LoggerFactory.getLogger(CrateDBChangeConsumer.class);
 
     // SQL statements used to interact with the CrateDB
-    private static final String SQL_CREATE_TABLE = "CREATE TABLE IF NOT EXISTS %s (id varchar PRIMARY KEY, doc OBJECT)";
+    private static final String SQL_CREATE_TABLE = "CREATE TABLE IF NOT EXISTS %s (id varchar PRIMARY KEY, doc OBJECT) WITH (\"mapping.total_fields.limit\" = 20000)";
     private static final String SQL_UPSERT = "INSERT INTO %s (id, doc) VALUES (?::varchar, ?::JSON) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc";
     private static final String SQL_DELETE = "DELETE FROM %s WHERE id = ?::varchar";
 
