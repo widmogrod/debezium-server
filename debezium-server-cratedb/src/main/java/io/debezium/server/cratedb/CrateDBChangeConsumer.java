@@ -288,7 +288,9 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         }
 
         var bytes = getBytes(value);
-        return serdeValue.readValue(bytes, Object.class);
+        var result = serdeValue.readValue(bytes, Object.class);
+        result = Evolution.dedebeziumArrayDocuments(result);
+        return result;
     }
 
     private String getRecordId(ChangeEvent<Object, Object> record) throws JsonProcessingException {
