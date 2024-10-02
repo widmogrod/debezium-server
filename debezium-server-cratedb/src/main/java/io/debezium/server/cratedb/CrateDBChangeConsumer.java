@@ -144,7 +144,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         for (ChangeEvent<Object, Object> record : records) {
             String tableId = getTableId(record);
             try {
-                String recordId = getRecordId(record);
+                String recordId = getRecordId(record.key());
                 recordMap.computeIfAbsent(tableId, k -> new LinkedHashMap<>()).put(recordId, record);
             }
             catch (JsonProcessingException e) {
@@ -293,8 +293,8 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         return result;
     }
 
-    private String getRecordId(ChangeEvent<Object, Object> record) throws JsonProcessingException {
-        var key = serdeKey.deserializer().deserialize("xx", getBytes(record.key()));
+    private String getRecordId(Object recordKey) throws JsonProcessingException {
+        var key = serdeKey.deserializer().deserialize("xx", getBytes(recordKey));
         if (key instanceof String str) {
             return str;
         }
