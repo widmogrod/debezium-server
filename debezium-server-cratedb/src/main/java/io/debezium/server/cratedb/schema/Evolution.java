@@ -640,4 +640,34 @@ public class Evolution {
 
         return a.equals(b);
     }
+
+    public static Object extractNonCasted(Object x) {
+        return switch (x) {
+            case PartialValue(Object ignored, Object original) -> switch (original) {
+                case String s -> s;
+                case Number n -> n;
+                case Boolean b -> b;
+                default -> extractNonCasted(original);
+            };
+
+            case Map map -> {
+                var result = new LinkedHashMap<>();
+                for (var key : map.keySet()) {
+                    var value = extractNonCasted(map.get(key));
+                    if (value != null) {
+                        result.put(key, value);
+                    }
+                }
+                yield result;
+            }
+            case List list -> {
+                var result = new ArrayList<>();
+                for (var element : list) {
+                    result.add(extractNonCasted(element));
+                }
+                yield result;
+            }
+            default -> null;
+        };
+    }
 }

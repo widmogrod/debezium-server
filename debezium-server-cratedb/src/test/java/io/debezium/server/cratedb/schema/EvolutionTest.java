@@ -7,6 +7,7 @@ package io.debezium.server.cratedb.schema;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -146,5 +147,33 @@ class EvolutionTest {
                 "?", Schema.Primitive.DOUBLE);
 
         assertThat(Evolution.similar(schema1, schema2)).isTrue();
+    }
+
+    @Test
+    void testExtractPartialOriginal() {
+        var given = Map.of(
+                "ok", "value",
+                "name", PartialValue.of("666", 666),
+                "list", List.of(
+                        1,
+                        PartialValue.of(2, "23"),
+                        3
+                ),
+                "nested", PartialValue.of(null,
+                        List.of(
+                                PartialValue.of(List.of(1,2,3), "[1,2,3]")
+                        ))
+        );
+
+        var result =  Evolution.extractNonCasted(given);
+        assertThat(result).isEqualTo(Map.of(
+                "name", 666,
+                "list", new ArrayList(){{
+                    add(null);
+                    add("23");
+                    add(null);
+                }},
+                "nested", List.of("[1,2,3]")
+        ));
     }
 }
