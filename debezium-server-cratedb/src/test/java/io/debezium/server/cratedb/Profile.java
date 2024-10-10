@@ -10,11 +10,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTestProfile;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
-
-import static io.debezium.server.cratedb.Profile.MongoDBAndCrateDB.DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING;
 
 public class Profile {
+    public final static String DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING = "DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING";
 
     public static int waitForSeconds() {
         return 60;
@@ -66,10 +64,8 @@ public class Profile {
         }
     }
 
-    @EnabledIfEnvironmentVariable(named = DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING, matches = "mongo.*")
     @QuarkusTestResource(CrateTestResourceLifecycleManager.class)
     public static class MongoDBAndCrateDB implements QuarkusTestProfile {
-        public final static String DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING = "DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING";
 
         @Override
         public Map<String, String> getConfigOverrides() {

@@ -5,6 +5,7 @@
  */
 package io.debezium.server.cratedb.infoschema;
 
+import static io.debezium.server.cratedb.Profile.DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -15,6 +16,7 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +32,7 @@ import io.quarkus.test.junit.TestProfile;
  */
 @QuarkusTest
 @TestProfile(Profile.PostgresAndCrateDB.class)
+@DisabledIfEnvironmentVariable(named = DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING, matches = ".*", disabledReason = "Quarkus has some issue, when MongoDB and Postgres are run together")
 class InformationSchemaLoaderTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(InformationSchemaLoaderTest.class);
 

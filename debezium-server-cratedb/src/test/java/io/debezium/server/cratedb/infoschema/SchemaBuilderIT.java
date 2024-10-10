@@ -5,6 +5,7 @@
  */
 package io.debezium.server.cratedb.infoschema;
 
+import static io.debezium.server.cratedb.Profile.DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -17,6 +18,8 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
+import org.opentest4j.AssertionFailedError;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +36,7 @@ import io.quarkus.test.junit.TestProfile;
 
 @QuarkusTest
 @TestProfile(Profile.PostgresAndCrateDB.class)
+@DisabledIfEnvironmentVariable(named = DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING, matches = ".*", disabledReason = "Quarkus has some issue, when MongoDB and Postgres are run together")
 class SchemaBuilderIT {
     private static final Logger LOGGER = LoggerFactory.getLogger(InformationSchemaLoaderTest.class);
 
@@ -195,10 +199,14 @@ class SchemaBuilderIT {
             LOGGER.info("manager2={}", manager2);
             LOGGER.info("manager3={}", manager3);
 
-            assertThat(Evolution.similar(manager1, manager3)).isTrue();
-            // assertThat(manager1).
-            // usingRecursiveComparison().
-            // isEqualTo(manager3);
+            try {
+                assertThat(Evolution.similar(manager1, manager3)).isTrue();
+            }
+            catch (AssertionFailedError e) {
+                LOGGER.error("Failed similar schema assertion: {}", e);
+                LOGGER.warn("Display where difference is:");
+                assertThat(manager1).usingRecursiveComparison().isEqualTo(manager3);
+            }
         });
     }
 }

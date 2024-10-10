@@ -5,19 +5,8 @@
  */
 package io.debezium.server.cratedb;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.debezium.server.DebeziumServer;
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
-import jakarta.inject.Inject;
-import org.awaitility.Awaitility;
-import org.bson.Document;
-import org.bson.types.Decimal128;
-import org.bson.types.ObjectId;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static io.debezium.server.cratedb.Profile.DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -31,17 +20,40 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import jakarta.inject.Inject;
+
+import org.awaitility.Awaitility;
+import org.bson.Document;
+import org.bson.types.Decimal128;
+import org.bson.types.ObjectId;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+
+import io.debezium.server.DebeziumServer;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
 
 /**
  * Integration test that verifies basic reading from MongoDB database and writing to CrateDB stream.
  *
- * @author Gabriel habryn
+ * @author Gabriel Habryn
  */
 @QuarkusTest
+@EnabledIfEnvironmentVariable(named = DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING, matches = "mongo.*")
 @TestProfile(Profile.MongoDBAndCrateDB.class)
 public class MongoCrateDBIT {
     private static Connection conn;
+    private static MongoClient mongo;
+
+    private static final String connectionString = System.getenv(
+            DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING);
 
     @Inject
     DebeziumServer server;
@@ -50,6 +62,7 @@ public class MongoCrateDBIT {
     void setup() throws Exception {
         // Initialize the connection
         conn = DriverManager.getConnection(CrateTestResourceLifecycleManager.getUrl());
+        mongo = MongoClients.create(connectionString);
     }
 
     @AfterEach
@@ -80,13 +93,11 @@ public class MongoCrateDBIT {
                 .containsEntry("offset.storage.cratedb.connection_url", CrateTestResourceLifecycleManager.getUrl());
 
         assertThat(props)
-                .containsEntry("mongodb.connection.string", System.getenv(Profile.MongoDBAndCrateDB.DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING));
+                .containsEntry("mongodb.connection.string", connectionString);
     }
 
     @Test
     void testMongoDBConnection() throws SQLException, JsonProcessingException {
-        var mongo = MongoTestResourceLifecycleManager.getMongoClientStandard();
-
         var databases = new ArrayList<>();
         mongo.listDatabaseNames().into(databases);
         assertThat(databases).containsAll(List.of("admin", "local"));
@@ -100,8 +111,7 @@ public class MongoCrateDBIT {
         var object1 = Map.of(
                 ".", -123.31239,
                 "name", 4,
-                "name_integer", "Asdf"
-        );
+                "name_integer", "Asdf");
         var document1 = new Document();
         document1.append("_id", new ObjectId("6707c4703ceb57275d16037e"))
                 .append("array", Arrays.asList(53, 76, 55))
@@ -117,9 +127,8 @@ public class MongoCrateDBIT {
         docs.add(document1);
 
         var object2 = Map.of(
-                "$", -123.31239,
-                "name", "Queen"
-        );
+                "$", 513.23,
+                "name", "Queen");
         var document2 = new Document();
         document2.append("_id", new ObjectId("6707c4703ceb57275d16037f"))
                 .append("array", Arrays.asList(37, 65, 90))
@@ -129,7 +138,7 @@ public class MongoCrateDBIT {
                 .append("double", 12.031154844035463)
                 .append("int", 50)
                 .append("long", -8613795666966012363L)
-                .append("null", "hello" .getBytes())
+                .append("null", "hello".getBytes())
                 .append("obj", new Document(object2))
                 .append("string", "2cbde6de-8b72-4763-9364-15cc6fe5ca05");
         docs.add(document2);
@@ -168,44 +177,58 @@ public class MongoCrateDBIT {
         }
 
         List<HashMap<String, Object>> expected = new ArrayList<>();
-        HashMap<String, Object> firstMap = new HashMap<>() {{
-            put("id", "6707c4703ceb57275d16037e");
-            put("doc", new HashMap<String, Object>() {{
-                put("_id", "6707c4703ceb57275d16037e");
-                put("array", Arrays.asList(53, 76, 55));
-                put("boolean", false);
-                put("date", 1728511200000L);
-                put("decimal", "18.261063697793077");
-                put("double", 24.59059419857732);
-                put("int", 72);
-                // NOTE non "null": null, this is because column/sub-column with null type dont' give value to strict CrateDB schema
-                // and when new column with "null" field will have a value like int, or string.
-                // It's better to crate column with schema at time when we know specific type.
-                // Second document, has "null" field set to binary.
-                put("long", 5997345523540356169L);
-                put("obj", Map.of("_dot_", -123.31239, "name", 4, "name_integer", "Asdf"));
-                put("string", "b27692de-66c7-4516-8bfc-28da16c1e532");
-            }});
-        }};
+        HashMap<String, Object> firstMap = new HashMap<>() {
+            {
+                put("id", "6707c4703ceb57275d16037e");
+                put("doc", new HashMap<String, Object>() {
+                    {
+                        put("_id", "6707c4703ceb57275d16037e");
+                        put("array", Arrays.asList(53, 76, 55));
+                        put("boolean", false);
+                        put("date", 1728511200000L);
+                        put("decimal", "18.261063697793077");
+                        put("double", 24.59059419857732);
+                        put("int", 72);
+                        // NOTE non "null": null, this is because column/sub-column with null type dont' give value to strict CrateDB schema
+                        // and when new column with "null" field will have a value like int, or string.
+                        // It's better to crate column with schema at time when we know specific type.
+                        // Second document, has "null" field set to binary.
+                        put("long", 5997345523540356169L);
+                        put("obj", Map.of("_dot_", -123.31239, "name", 4, "name_integer", "Asdf"));
+                        put("string", "b27692de-66c7-4516-8bfc-28da16c1e532");
+                    }
+                });
+            }
+        };
         expected.add(firstMap);
-        HashMap<String, Object> secondMap = new HashMap<>() {{
-            put("id", "6707c4703ceb57275d16037f");
-            put("doc", new HashMap<String, Object>() {{
-                put("_id", "6707c4703ceb57275d16037f");
-                put("array", Arrays.asList(37, 65, 90));
-                put("boolean", true);
-                put("date", 1728511200000L);
-                put("decimal", "86.9112949809932");
-                put("double", 12.031154844035463);
-                put("int", 50);
-                put("null", "aGVsbG8=");
-                put("long", -8613795666966012363L);
-                put("obj", new HashMap() {{
-                    put("$", -123.31239);
-                }});
-                put("string", "2cbde6de-8b72-4763-9364-15cc6fe5ca05");
-            }});
-        }};
+        HashMap<String, Object> secondMap = new HashMap<>() {
+            {
+                put("id", "6707c4703ceb57275d16037f");
+                put("doc", new HashMap<String, Object>() {
+                    {
+                        put("_id", "6707c4703ceb57275d16037f");
+                        put("array", Arrays.asList(37, 65, 90));
+                        put("boolean", true);
+                        put("date", 1728511200000L);
+                        put("decimal", "86.9112949809932");
+                        put("double", 12.031154844035463);
+                        put("int", 50);
+                        put("null", "aGVsbG8=");
+                        put("long", -8613795666966012363L);
+                        put("obj", new HashMap() {
+                            {
+                                put("$", 513.23);
+                                // INFO: this field is null, because name in first record is int, and in second string
+                                // this result in type collision, and default behaviour instead of failing whole record
+                                // make all the effort to save values
+                                // put("name", null);
+                            }
+                        });
+                        put("string", "2cbde6de-8b72-4763-9364-15cc6fe5ca05");
+                    }
+                });
+            }
+        };
         expected.add(secondMap);
         assertThat(results).isEqualTo(expected);
     }

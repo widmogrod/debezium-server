@@ -5,6 +5,7 @@
  */
 package io.debezium.server.cratedb;
 
+import static io.debezium.server.cratedb.Profile.DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -33,6 +34,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.postgresql.util.PSQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +52,7 @@ import io.quarkus.test.junit.TestProfile;
  */
 @QuarkusTest
 @TestProfile(Profile.PostgresAndCrateDB.class)
+@DisabledIfEnvironmentVariable(named = DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING, matches = ".*", disabledReason = "Quarkus has some issue, when MongoDB and Postgres are run together")
 public class CrateExperiments {
     private static final Logger LOGGER = LoggerFactory.getLogger(CrateExperiments.class);
 
@@ -71,6 +74,7 @@ public class CrateExperiments {
         // Close the connection if it's not null and not closed
         if (conn != null && !conn.isClosed()) {
             conn.close();
+            conn = null;
         }
     }
 
@@ -120,9 +124,9 @@ public class CrateExperiments {
         ObjectMapper mapper = new ObjectMapper();
 
         for (Object type : covertToTypes) {
-            LOGGER.error(" raw={}", type);
+            LOGGER.info(" raw={}", type);
             assertDoesNotThrow(() -> {
-                LOGGER.error("json={}", mapper.writeValueAsString(type));
+                LOGGER.info("json={}", mapper.writeValueAsString(type));
             });
         }
     }
