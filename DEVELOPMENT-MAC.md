@@ -12,19 +12,14 @@ brew install maven
 # https://podman.io/docs/installation
 brew install podman
 podman machine init --cpus 6 -m 10 --rootful --user-mode-networking
-podman machine start 
-
-# https://java.testcontainers.org/supported_docker_environment/#colima
-export DOCKER_HOST=unix://$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}')
-export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
-export TESTCONTAINERS_RYUK_DISABLED=true
+podman machine start
 
 ## for colima
 colima start --network-address
-export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
-export TESTCONTAINERS_HOST_OVERRIDE=$(colima ls -j | jq -r 'select(.name == "default") | .address')
-export DOCKER_HOST="unix://${HOME}/.colima/default/docker.sock"
-export TESTCONTAINERS_RYUK_DISABLED=true
+
+## setup env variables
+cp .envrc.colima .envrc
+source .envrc
 
 ### colima fixes and issues
 issue: https://github.com/abiosoft/colima/issues/449
