@@ -177,7 +177,7 @@ public class Evolution {
             case null -> null;
             case Map map -> {
                 if (isDebeziumArrayDocument(map)) {
-                    yield  ((Map<Object, Object>) map).entrySet().stream()
+                    yield ((Map<Object, Object>) map).entrySet().stream()
                             .sorted(Comparator.comparing(entry -> entry.getKey().toString()))
                             .map((entry) -> dedebeziumArrayDocuments(entry.getValue()))
                             .collect(Collectors.toList());
@@ -278,10 +278,6 @@ public class Evolution {
                         if (fields.containsKey(fieldName)) {
                             var valueType = fields.get(fieldName);
                             fieldValue = tryCast(fieldValue, valueType);
-                            if (fieldValue instanceof PartialValue) {
-                                // if value is partial, we could try to add type suffix here!
-                                fieldName = typeSuffix(fieldName, valueType, detectType(fieldValue));
-                            }
                         }
 
                         result.put(fieldName, fieldValue);
@@ -313,7 +309,10 @@ public class Evolution {
 
     public static Object normaliseFieldName(Object fieldName) {
         if (fieldName instanceof String str) {
-            return str.replaceAll("\\[", "bkt_").replaceAll("\\]", "_bkt").replaceAll(";", "_semicolon_").replaceAll("\\.", "_dot_");
+            return str.replaceAll("\\[", "bkt_")
+                    .replaceAll("\\]", "_bkt")
+                    .replaceAll(";", "_semicolon_")
+                    .replaceAll("\\.", "_dot_");
         }
 
         return fieldName;
@@ -377,6 +376,89 @@ public class Evolution {
 
                 yield Schema.Coli.of(a, b);
             }
+        };
+    }
+
+    /**
+     * Takes schema and object, and apply type suffix strategy to collision types
+     */
+    public static Object typeSuffix(Schema.I schema, Object object) {
+        if (object == null) {
+            return null;
+        }
+
+        return switch (schema) {
+            case Schema.Coli(Set<Schema.I> ignored) -> object;
+            case Schema.Array(Schema.I innerType) -> switch (object) {
+                case List list -> {
+                    // From all available options how to deal with poly arrays: [1, false, [3, "4"]]
+                    // Best way is just to leave it as is, and don't try to split array like:
+                    //  array_int = [1]
+                    //  array_bool = [false]
+                    //  array_int_array = [3]
+                    //  array_text_array = ["4"]
+                    var result = new ArrayList<>();
+                    for (var element : list) {
+                        result.add(typeSuffix(innerType, element));
+                    }
+                    yield result;
+                }
+                default -> object;
+            };
+            case Schema.Dict(Map<Object, Schema.I> fields) -> switch (object) {
+                case Map map -> {
+                    var result = new LinkedHashMap<>();
+                    for (var fieldName : map.keySet()) {
+                        if (!fields.containsKey(fieldName)) {
+                            // ignore fields that are not in schema
+                            continue;
+                        }
+
+                        var valueType = fields.get(fieldName);
+                        var entryValue = map.get(fieldName);
+
+                        if ((valueType instanceof Schema.Coli coli &&
+                                entryValue instanceof PartialValue partialValue)) {
+                            continue;
+                        }
+
+                        // 1. do first pass focusing on non colliding values.
+                        //    Because in original schema there can be field that typeSuffix will collide with
+                        //    This step ensures that we keep schema as close to original as possible.
+                        result.put(fieldName, typeSuffix(valueType, entryValue));
+                    }
+
+                    for (var fieldName : map.keySet()) {
+                        if (!fields.containsKey(fieldName)) {
+                            // ignore fields that are not in schema
+                            continue;
+                        }
+
+                        var valueType = fields.get(fieldName);
+                        var entryValue = map.get(fieldName);
+
+                        if (valueType instanceof Schema.Coli coli &&
+                                entryValue instanceof PartialValue partialValue) {
+                            var originalValue = partialValue.original();
+                            var resultSchema = coli.set().stream().findFirst().get();
+                            var detectedSchema = detectType(originalValue);
+                            var finalTypeName = typeSuffix(fieldName, resultSchema, detectedSchema);
+                            if (result.containsKey(finalTypeName)) {
+                                // 2. In case name is already in use.
+                                //    Algorithm will leave colliding type as is.
+                                result.put(fieldName, typeSuffix(valueType, entryValue));
+                            } else {
+                                result.put(finalTypeName, originalValue);
+                            }
+                        }
+                    }
+
+                    yield result;
+                }
+                default -> object;
+            };
+            case Schema.Bit(Number ignored) -> object;
+            case Schema.Primitive ignored -> object;
         };
     }
 

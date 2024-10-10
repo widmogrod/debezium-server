@@ -121,7 +121,7 @@ class SchemaTest {
                         "name", PartialValue.of("false", false),
                         "age", PartialValue.of(null, "not available"),
                         "address", List.of(
-                                Map.of("zip-code_bool_array", PartialValue.of("[false]", List.of(false))),
+                                Map.of("zip-code", PartialValue.of("[false]", List.of(false))),
                                 Map.of("country", "Poland"))));
         // schema must be immutable
         assertThat(schema1).isEqualTo(
@@ -225,5 +225,52 @@ class SchemaTest {
 
         var json22 = new ObjectMapper().writeValueAsString(object22);
         assertThat(json22).isEqualTo("{\"new_col\":\"[1.1, 2.2, 3.3]\",\"id\":8}");
+    }
+
+    @Test
+    void testTypeSuffixOnCollision() {
+        var schema = Schema.Dict.of(
+                "name", Schema.Coli.of(Schema.Primitive.TEXT, Schema.Primitive.BOOLEAN),
+                "name_bool", Schema.Primitive.TEXT,
+                "age", Schema.Coli.of(Schema.Primitive.BIGINT, Schema.Primitive.TEXT),
+                "address", Schema.Array.of(Schema.Dict.of(
+                        "zip-code", Schema.Coli.of(Schema.Primitive.TEXT, Schema.Array.of(Schema.Primitive.BOOLEAN)),
+                        "country", Schema.Primitive.TEXT)),
+                "list_of_list", Schema.Array.of(Schema.Array.of(Schema.Primitive.BOOLEAN)),
+                "bag", Schema.Array.of(Schema.Coli.of(
+                        Schema.Primitive.BIGINT,
+                        Schema.Primitive.BOOLEAN,
+                        Schema.Primitive.TEXT)));
+
+        var object = Map.of(
+                "name", PartialValue.of("false", false),
+                "name_bool", "Asd",
+                "age", PartialValue.of(null, "not available"),
+                "address", List.of(
+                        Map.of("zip-code", PartialValue.of("[false]", List.of(false))),
+                        Map.of("country", "Poland")));
+
+        var result = Evolution.typeSuffix(schema, object);
+
+        assertThat(result).usingRecursiveComparison().isEqualTo(
+                new HashMap<>() {
+                    {
+                        // resolution of name to -> name_bool would result in conflict with existing type, so leave it as is.
+                        put("name", PartialValue.of("false", false));
+                        put("name_bool", "Asd");
+                        put("age_text", "not available");
+                        put("address", List.of(
+                                new HashMap<>() {
+                                    {
+                                        put("zip-code_bool_array", List.of(false));
+                                    }
+                                },
+                                new HashMap<>() {
+                                    {
+                                        put("country", "Poland");
+                                    }
+                                }));
+                    }
+                });
     }
 }
