@@ -5,6 +5,7 @@
  */
 package io.debezium.server.cratedb;
 
+import static io.debezium.server.cratedb.Profile.DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
@@ -33,6 +34,7 @@ import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,6 +53,7 @@ import io.quarkus.test.junit.TestProfile;
  */
 @QuarkusTest
 @TestProfile(Profile.PostgresAndCrateDB.class)
+@DisabledIfEnvironmentVariable(named = DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING, matches = ".*", disabledReason = "Quarkus has some issue, when MongoDB and Postgres are run together")
 public class PostgresCrateDBIT {
     private static Connection conn;
 
