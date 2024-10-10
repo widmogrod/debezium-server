@@ -82,41 +82,47 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     private Connection conn = null;
 
     @PostConstruct
-    void connect() throws SQLException, RuntimeException {
-        LOGGER.info("Connecting to {}", url);
+    void start() {
+        try {
+            LOGGER.info("Connecting to {}", url);
 
-        if (conn == null) {
-            conn = DriverManager.getConnection(url);
-            // conn.setAutoCommit(false);
-            LOGGER.debug("New connection established");
+            if (conn == null) {
+                conn = DriverManager.getConnection(url);
+                // conn.setAutoCommit(false);
+                LOGGER.debug("New connection established");
+            }
+
+            // check if is connected
+            if (conn.isClosed()) {
+                LOGGER.error("Driver connection is closed");
+                throw new RuntimeException("Driver connection is closed");
+            }
+
+            ResultSet pingStmt = conn.createStatement().executeQuery("SELECT 1");
+            if (!pingStmt.next()) {
+                LOGGER.error("Ping query returned no results");
+                throw new RuntimeException("Ping query returned no results");
+            }
+
+            if (pingStmt.getInt(1) != 1) {
+                LOGGER.error("Ping query returned '{}' but expected 1", pingStmt.getInt(0));
+                throw new RuntimeException("Ping query returned '" + pingStmt.getString(0) + "' but expected 1");
+            }
+
+            LOGGER.info("Connected");
         }
-
-        // check if is connected
-        if (conn.isClosed()) {
-            LOGGER.error("Driver connection is closed");
-            throw new RuntimeException("Driver connection is closed");
+        catch (SQLException e) {
+            throw new RuntimeException("Failed to initialise connection to CrateDB", e);
         }
-
-        ResultSet pingStmt = conn.createStatement().executeQuery("SELECT 1");
-        if (!pingStmt.next()) {
-            LOGGER.error("Ping query returned no results");
-            throw new RuntimeException("Ping query returned no results");
-        }
-
-        if (pingStmt.getInt(1) != 1) {
-            LOGGER.error("Ping query returned '{}' but expected 1", pingStmt.getInt(0));
-            throw new RuntimeException("Ping query returned '" + pingStmt.getString(0) + "' but expected 1");
-        }
-
-        LOGGER.info("Connected");
     }
 
     @PreDestroy
-    void close() {
+    void stop() {
         LOGGER.info("closing connection...");
         try {
             if (conn != null) {
                 conn.close();
+                conn = null;
                 LOGGER.info("closed connection");
             }
         }
