@@ -47,7 +47,7 @@ import io.quarkus.test.junit.TestProfile;
 /**
  * Integration test that verifies basic reading from PostgresSQL database and writing to CrateDB stream.
  *
- * @author Gabriel habryn
+ * @author Gabriel Habryn
  */
 @QuarkusTest
 @TestProfile(Profile.PostgresAndCrateDB.class)

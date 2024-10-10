@@ -5,13 +5,13 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import org.junit.jupiter.api.Test;
+import static io.debezium.server.cratedb.schema.Evolution.dedebeziumArrayDocuments;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 import java.util.List;
 import java.util.Map;
 
-import static io.debezium.server.cratedb.schema.Evolution.dedebeziumArrayDocuments;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import org.junit.jupiter.api.Test;
 
 public class DeDebeziumTest {
     @Test
@@ -30,8 +30,7 @@ public class DeDebeziumTest {
                 false,
                 3,
                 4,
-                true
-        ));
+                true));
     }
 
     @Test
@@ -56,8 +55,7 @@ public class DeDebeziumTest {
                         "role", "King",
                         "-=", -123.31239),
                 "embeddedDoc", Map.of("x", 35),
-                "array", Map.of("_0", 93, "_1", 93, "_2", 68)
-        );
+                "array", Map.of("_0", 93, "_1", 93, "_2", 68));
 
         var result = dedebeziumArrayDocuments(object01);
 
@@ -67,12 +65,10 @@ public class DeDebeziumTest {
                         "id", 4,
                         "name_character", List.of(
                                 List.of(Map.of(), Map.of("lucky", 444, "truth", false), "Queen"),
-                                List.of(Map.of(), Map.of("lucky", 444, "truth", false),  "Queen")
-                        ),
+                                List.of(Map.of(), Map.of("lucky", 444, "truth", false), "Queen")),
                         "role", "King",
                         "-=", -123.31239),
                 "embeddedDoc", Map.of("x", 35),
-                "array", List.of(93, 93, 68)
-        ));
+                "array", List.of(93, 93, 68)));
     }
 }

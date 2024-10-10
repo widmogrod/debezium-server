@@ -5,10 +5,10 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import org.apache.commons.lang3.tuple.Pair;
-
 import java.util.*;
 import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Implementation of the schema evolution for CrateDB
@@ -166,7 +166,7 @@ public class Evolution {
             case null -> null;
             case Map map -> {
                 if (isDebeziumArrayDocument(map)) {
-                    yield  ((Map<Object, Object>) map).entrySet().stream()
+                    yield((Map<Object, Object>) map).entrySet().stream()
                             .sorted(Comparator.comparing(entry -> entry.getKey().toString()))
                             .map((entry) -> dedebeziumArrayDocuments(entry.getValue()))
                             .collect(Collectors.toList());
@@ -447,50 +447,22 @@ public class Evolution {
     }
 
     public static Schema.I detectType(Object fieldValue) {
-        return switch (fieldValue) {
-            case String ignored -> Schema.Primitive.TEXT;
-            case Integer ignored -> Schema.Primitive.BIGINT;
-            case Long ignored -> Schema.Primitive.BIGINT;
-            case Double ignored -> Schema.Primitive.DOUBLE;
-            case Boolean ignored -> Schema.Primitive.BOOLEAN;
-            case Date ignored -> Schema.Primitive.BIGINT;
-            case List of -> Schema.Array.of(of.isEmpty() ? Schema.Primitive.NULL : detectType(of.getFirst()));
-            case Map ignored -> Schema.Dict.of();
-            case PartialValue(Object ignored, Object original) -> detectType(original);
-            default -> throw new IllegalArgumentException("Unknown type: " + fieldValue.getClass());
-        };
+        return switch(fieldValue){case String ignored->Schema.Primitive.TEXT;case Integer ignored->Schema.Primitive.BIGINT;case Long ignored->Schema.Primitive.BIGINT;case Double ignored->Schema.Primitive.DOUBLE;case Boolean ignored->Schema.Primitive.BOOLEAN;case Date ignored->Schema.Primitive.BIGINT;case List of->Schema.Array.of(of.isEmpty()?Schema.Primitive.NULL:detectType(of.getFirst()));case Map ignored->Schema.Dict.of();case PartialValue(Object ignored,Object original)->detectType(original);default->throw new IllegalArgumentException("Unknown type: "+fieldValue.getClass());};
     }
 
     /**
      * Return schema under a path or none
      */
     public static Optional<Schema.I> fromPath(List<String> path, Schema.I schema) {
-        if (path.isEmpty()) {
-            return Optional.of(schema);
-        }
+        if(path.isEmpty()){return Optional.of(schema);}
 
-        return switch (schema) {
-            case Schema.Dict(Map<Object, Schema.I> fields) -> {
-                var fieldName = path.get(0);
-                if (fields.containsKey(fieldName)) {
-                    var fieldValue = fields.get(fieldName);
-                    var remainingPath = path.subList(1, path.size());
-                    yield fromPath(remainingPath, fieldValue);
-                }
+        return switch(schema){case Schema.Dict(Map<Object,Schema.I>fields)->{var fieldName=path.get(0);if(fields.containsKey(fieldName)){var fieldValue=fields.get(fieldName);var remainingPath=path.subList(1,path.size());yield fromPath(remainingPath,fieldValue);}
 
-                yield Optional.empty();
-            }
+        yield Optional.empty();}
 
-            case Schema.Array(Schema.I innerType) -> {
-                var fieldName = path.get(0);
-                if (Objects.equals(fieldName, "*")) {
-                    yield fromPath(path.subList(1, path.size()), innerType);
-                }
+        case Schema.Array(Schema.I innerType)->{var fieldName=path.get(0);if(Objects.equals(fieldName,"*")){yield fromPath(path.subList(1,path.size()),innerType);}
 
-                yield Optional.empty();
-            }
-            default -> Optional.empty();
-        };
+        yield Optional.empty();}default->Optional.empty();};
     }
 
     public static boolean equal(Schema.I a, Schema.I b) {
