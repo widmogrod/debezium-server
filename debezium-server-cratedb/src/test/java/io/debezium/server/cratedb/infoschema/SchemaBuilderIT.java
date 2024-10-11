@@ -15,11 +15,12 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.debezium.server.cratedb.CrateDBChangeConsumer;
+import io.debezium.server.cratedb.schema.Diff;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
-import org.opentest4j.AssertionFailedError;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,14 +97,15 @@ class SchemaBuilderIT {
         // working = 1727213537780L - ERROR: Dynamic nested arrays are not supported
         // working = 1727306306043L ERROR: Mixed dataTypes inside a list are not supported. Found boolean and object
         // working - 1727390353003L - similarity assertion, object_array reconstruction
+        // not-working 1728647704912L
         var seed = System.currentTimeMillis();
         LOGGER.error("seed={}", seed);
-        DataGen.setSeed(seed);
+        DataGen.setSeed(1728647704912L);
 
         assertDoesNotThrow(() -> {
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("DROP TABLE IF EXISTS test");
-                stmt.execute("CREATE TABLE test (id TEXT PRIMARY KEY, doc OBJECT)");
+                stmt.execute(CrateDBChangeConsumer.SQL_CREATE_TABLE.formatted("test"));
                 stmt.execute("REFRESH TABLE test");
             }
 
@@ -199,14 +201,9 @@ class SchemaBuilderIT {
             LOGGER.info("manager2={}", manager2);
             LOGGER.info("manager3={}", manager3);
 
-            try {
-                assertThat(Evolution.similar(manager1, manager3)).isTrue();
-            }
-            catch (AssertionFailedError e) {
-                LOGGER.error("Failed similar schema assertion: {}", e);
-                LOGGER.warn("Display where difference is:");
-                assertThat(manager1).usingRecursiveComparison().isEqualTo(manager3);
-            }
+            var diff = Diff.compare(manager1, manager3);
+            LOGGER.info("diff={}", Diff.prettyPrint(diff));
+            assertThat(Evolution.similar(manager1, manager3)).isTrue();
         });
     }
 }
