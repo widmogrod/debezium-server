@@ -447,7 +447,8 @@ public class Evolution {
                                 // 2. In case name is already in use.
                                 //    Algorithm will leave colliding type as is.
                                 result.put(fieldName, typeSuffix(valueType, entryValue));
-                            } else {
+                            }
+                            else {
                                 result.put(finalTypeName, originalValue);
                             }
                         }
@@ -665,8 +666,20 @@ public class Evolution {
                     // but if aValue is collision, tolerate it
                     if (aValue instanceof Schema.Coli ||
                             (aValue instanceof Schema.Array arr && arr.innerType() instanceof Schema.Coli)) {
-                        return true;
+                        continue;
                     }
+
+                    var unsuffixed = unsuffiedTypeName(aKey.toString(), aValue);
+                    var unsuffixedFieldName = unsuffixed.getLeft();
+                    var unsuffixedFieldType = unsuffixed.getRight();
+                    if (fieldsB.containsKey(unsuffixedFieldName)) {
+                        var bValue = fieldsB.get(unsuffixedFieldName);
+                        if (bValue instanceof Schema.Coli bColi
+                          && bColi.set().contains(unsuffixedFieldType)) {
+                            continue;
+                        }
+                    }
+
                     return false;
                 }
 
@@ -682,24 +695,12 @@ public class Evolution {
         if (a instanceof Schema.Coli aColi && b instanceof Schema.Coli bColi) {
             var aSet = aColi.set();
             var bSet = bColi.set();
-            if (aSet.size() != bSet.size()) {
-                return false;
-            }
 
-            // check if positional elements are the same type
-            Iterator<Schema.I> aSetIterator = aSet.iterator();
-            Iterator<Schema.I> bSetIterator = bSet.iterator();
+            // WEEK: assumption, if first element of collision are the same, treat them as the same
+            var aFirst = aSet.iterator().next();
+            var bFirst = bSet.iterator().next();
 
-            while (aSetIterator.hasNext() && bSetIterator.hasNext()) {
-                Schema.I aElement = aSetIterator.next();
-                Schema.I bElement = bSetIterator.next();
-
-                if (!aElement.equals(bElement)) {
-                    return false;
-                }
-            }
-
-            return true;
+            return similar(aFirst, bFirst);
         }
 
         // WEEK: assumption, if first element of collision is the same as the original type then they can be considered similar
