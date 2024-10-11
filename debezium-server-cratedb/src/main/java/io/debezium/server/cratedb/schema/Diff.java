@@ -31,10 +31,10 @@ public class Diff {
         if (a instanceof Schema.Array aArray && b instanceof Schema.Array bArray) {
             var nestedChangeSet = compare(aArray.innerType(), bArray.innerType());
             if (!nestedChangeSet.changes().isEmpty()) {
-                changes.add(new ChangeSet.Nested(nestedChangeSet));
+                changes.add(new ChangeSet.Positional("[]", new ChangeSet.Nested(nestedChangeSet)));
             }
             else {
-                changes.add(new ChangeSet.Unchanged(a));
+                changes.add(new ChangeSet.Positional("[]", new ChangeSet.Unchanged(a)));
             }
         }
         else if (a instanceof Schema.Bit aBit && b instanceof Schema.Bit bBit) {
@@ -47,18 +47,18 @@ public class Diff {
             }
         }
         else if (a instanceof Schema.Coli aColi && b instanceof Schema.Coli bColi) {
-            Set<Schema.I> added = bColi.set().stream().filter(e -> !aColi.set().contains(e)).collect(Collectors.toSet());
-            Set<Schema.I> removed = aColi.set().stream().filter(e -> !bColi.set().contains(e)).collect(Collectors.toSet());
             Set<Schema.I> unchanged = aColi.set().stream().filter(bColi.set()::contains).collect(Collectors.toSet());
+            Set<Schema.I> added = bColi.set().stream().filter(e -> !unchanged.contains(e)).collect(Collectors.toSet());
+            Set<Schema.I> removed = aColi.set().stream().filter(e -> !unchanged.contains(e)).collect(Collectors.toSet());
 
+            for (Schema.I unch : unchanged) {
+                changes.add(new ChangeSet.Unchanged(unch));
+            }
             for (Schema.I add : added) {
                 changes.add(new ChangeSet.Added(add));
             }
             for (Schema.I remove : removed) {
                 changes.add(new ChangeSet.Removed(remove));
-            }
-            for (Schema.I unch : unchanged) {
-                changes.add(new ChangeSet.Unchanged(unch));
             }
         }
         else if (a instanceof Schema.Dict aDict && b instanceof Schema.Dict bDict) {
@@ -100,30 +100,58 @@ public class Diff {
     public static String prettyPrint(ChangeSet changeSet) {
         var result = new StringBuilder();
 
-        result.append(Evolution.typeSuffix(changeSet.value())).append(" of \n");
         for (ChangeSet.Change change : changeSet.changes()) {
-            result.append(prettyPrint(change)).append("\n");
+            result
+                    .append(prettyPrint(change))
+                    .append("\n");
         }
 
-        return result.toString().trim();
+        return result.toString();
     }
 
     private static String prettyPrint(ChangeSet.Change change) {
         var result = new StringBuilder();
 
         switch (change) {
-            case ChangeSet.Added(Schema.I type) ->
-                    result.append(ANSI_GREEN).append("  + ").append(type).append(ANSI_RESET);
-            case ChangeSet.Removed(Schema.I type) ->
-                    result.append(ANSI_RED).append("  - ").append(type).append(ANSI_RESET);
-            case ChangeSet.Unchanged(Schema.I type) -> result.append("    ").append(type);
+            case ChangeSet.Added(Schema.I type) -> result
+                    .append(ANSI_GREEN)
+                    .append("+ ")
+                    .append(type)
+                    .append(ANSI_RESET);
+            case ChangeSet.Removed(Schema.I type) -> result
+                    .append(ANSI_RED)
+                    .append("- ")
+                    .append(type)
+                    .append(ANSI_RESET);
+            case ChangeSet.Unchanged(Schema.I type) -> result
+                    .append(ANSI_GREY)
+                    .append("  ")
+                    .append(type)
+                    .append(ANSI_RESET);
             case ChangeSet.Positional(Object keyOrIndex, ChangeSet.Change type) -> {
-                var nested = prettyPrint(type);
-                result.append("  > ").append(keyOrIndex).append(":\n").append(padLeft(1, nested));
+                // this mean a key was removed or delete
+                if (type instanceof ChangeSet.Removed) {
+                    result.append(ANSI_RED);
+                }
+                else if (type instanceof ChangeSet.Added) {
+                    result.append(ANSI_GREEN);
+                }
+
+                var pad  = type instanceof ChangeSet.Nested ? 0 : 1;
+
+                result
+                        .append(keyOrIndex)
+                        .append(":")
+                        .append("\n")
+                        .append(padLeft(pad, prettyPrint(type)))
+                        .append(ANSI_RESET)
+                ;
+
             }
             case ChangeSet.Nested(ChangeSet changes) -> {
-                var nestedResult = prettyPrint(changes);
-                result.append(nestedResult);
+                result
+                        .append((padLeft(1, prettyPrint(changes))))
+                ;
             }
         }
 
@@ -131,7 +159,7 @@ public class Diff {
     }
 
     private static String padLeft(Integer level, String text) {
-        var indent = "    " .repeat(level);
+        var indent = "  " .repeat(level);
         return text.lines()
                 .map(line -> indent + line)
                 .collect(Collectors.joining("\n"));
@@ -139,5 +167,6 @@ public class Diff {
 
     private static final String ANSI_RESET = "\u001B[0m";
     private static final String ANSI_RED = "\u001B[31m";
+    private static final String ANSI_GREY = "\u001B[90m";
     private static final String ANSI_GREEN = "\u001B[32m";
 }
