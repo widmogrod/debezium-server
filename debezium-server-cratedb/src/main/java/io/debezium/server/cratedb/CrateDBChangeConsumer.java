@@ -12,6 +12,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -57,7 +59,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     private static final Logger LOGGER = LoggerFactory.getLogger(CrateDBChangeConsumer.class);
 
     // SQL statements used to interact with the CrateDB
-    private static final String SQL_CREATE_TABLE = """
+    public static final String SQL_CREATE_TABLE = """
             CREATE TABLE IF NOT EXISTS %s (
                 id varchar PRIMARY KEY,
                 doc OBJECT,
@@ -68,14 +70,20 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             )
             WITH ("mapping.total_fields.limit" = 20000)
             """;
-    private static final String SQL_UPSERT = """
+    public static final String SQL_UPSERT = """
             INSERT INTO %s (id, doc, malformed)
             VALUES (?::varchar, ?::JSON, ?::JSON)
             ON CONFLICT (id) DO UPDATE
                 SET doc = excluded.doc
                   , malformed = excluded.malformed
             """;
-    private static final String SQL_DELETE = "DELETE FROM %s WHERE id = ?::varchar";
+    public static final String SQL_UPSERT_MALFORMED = """
+            INSERT INTO %s (id, malformed)
+            VALUES (?::varchar, ?::JSON)
+            ON CONFLICT (id) DO UPDATE
+                SET malformed = excluded.malformed
+            """;
+    public static final String SQL_DELETE = "DELETE FROM %s WHERE id = ?::varchar";
 
     // Prefix for the configuration properties
     private static final String PROP_PREFIX = "debezium.sink.cratedb.";
@@ -276,15 +284,26 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                                 var malformedDoc = getMalformedDoc(schema00, result00.getRight());
 
                                 String upsert = SQL_UPSERT.formatted(tableId);
-                                var stmt = conn.prepareStatement(upsert);
-                                stmt.setString(1, recordId);
-                                stmt.setString(2, recordDoc);
-                                stmt.setString(3, malformedDoc);
-                                stmt.execute();
+                                try (var stmt = conn.prepareStatement(upsert)) {
+                                    stmt.setString(1, recordId);
+                                    stmt.setString(2, recordDoc);
+                                    stmt.setString(3, malformedDoc);
+                                    stmt.execute();
+                                }
                             }
-                            catch (SQLException | IOException e) {
-                                LOGGER.warn("Failed  to upsert record tableId={} id={} code={}, exception={}",
-                                        tableId, recordId, processed[i], e.getMessage());
+                            catch (SQLException | IOException | RuntimeException e) {
+                                try {
+                                    String upsert = SQL_UPSERT_MALFORMED.formatted(tableId);
+                                    try (var stmt = conn.prepareStatement(upsert)) {
+                                        stmt.setString(1, recordId);
+                                        stmt.setString(2, getMalformedDoc(e));
+                                        stmt.execute();
+                                    }
+                                }
+                                catch (SQLException | RuntimeException e2) {
+                                    LOGGER.warn("Failed to upsert record tableId={} id={} code={}, exception={}, previous exception={}",
+                                            tableId, recordId, processed[i], e2.getMessage(), e.getMessage());
+                                }
                             }
                         }
                     }
@@ -297,13 +316,24 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                             String recordId = element.getKey();
                             try {
                                 String delete = SQL_DELETE.formatted(tableId);
-                                var stmt = conn.prepareStatement(delete);
-                                stmt.setString(1, recordId);
-                                stmt.execute();
+                                try (var stmt = conn.prepareStatement(delete)) {
+                                    stmt.setString(1, recordId);
+                                    stmt.execute();
+                                }
                             }
                             catch (SQLException e) {
-                                LOGGER.warn("Failed to delete record tableId={} id={} code={}, exception={}",
-                                        tableId, recordId, processed[i], e.getMessage());
+                                try {
+                                    String upsert = SQL_UPSERT_MALFORMED.formatted(tableId);
+                                    try (var stmt = conn.prepareStatement(upsert)) {
+                                        stmt.setString(1, recordId);
+                                        stmt.setString(2, getMalformedDoc(e));
+                                        stmt.execute();
+                                    }
+                                }
+                                catch (SQLException | RuntimeException e2) {
+                                    LOGGER.warn("Failed to delete record tableId={} id={} code={}, exception={} previous exception={}",
+                                            tableId, recordId, processed[i], e2.getMessage(), e.getMessage());
+                                }
                             }
                         }
                     }
@@ -402,6 +432,18 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
                 default -> null;
             };
+        }
+        catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String getMalformedDoc(Exception exception) {
+        try {
+            return convertToJson(new HashMap<>() {{
+                // get only first line of the message
+                put("msg", Arrays.stream(exception.getMessage().split("\n")).limit(1).collect(Collectors.joining("\n")));
+            }});
         }
         catch (JsonProcessingException e) {
             throw new RuntimeException(e);
