@@ -726,6 +726,7 @@ public class Evolution {
     public static Object extractNonCasted(Object x) {
         return extractNonCasted(x, false);
     }
+
     public static Object extractNonCasted(Object x, boolean isOriginal) {
         return switch (x) {
             case PartialValue(Object ignored, Object original) -> switch (original) {
