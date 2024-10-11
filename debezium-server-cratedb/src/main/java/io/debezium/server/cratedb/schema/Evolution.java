@@ -724,32 +724,48 @@ public class Evolution {
     }
 
     public static Object extractNonCasted(Object x) {
+        return extractNonCasted(x, false);
+    }
+    public static Object extractNonCasted(Object x, boolean isOriginal) {
         return switch (x) {
             case PartialValue(Object ignored, Object original) -> switch (original) {
                 case String s -> s;
                 case Number n -> n;
                 case Boolean b -> b;
-                default -> extractNonCasted(original);
+                default -> extractNonCasted(original, true);
             };
 
             case Map map -> {
                 var result = new LinkedHashMap<>();
                 for (var key : map.keySet()) {
-                    var value = extractNonCasted(map.get(key));
+                    var value = extractNonCasted(map.get(key), isOriginal);
                     if (value != null) {
                         result.put(key, value);
                     }
                 }
-                yield result;
+                // make sure we don't return empty objects
+                yield result.isEmpty() ? null : result;
             }
             case List list -> {
                 var result = new ArrayList<>();
+                var nullCount = result.size();
                 for (var element : list) {
-                    result.add(extractNonCasted(element));
+                    var value = extractNonCasted(element, isOriginal);
+                    if (value != null) {
+                        nullCount--;
+                    }
+
+                    result.add(value);
                 }
-                yield result;
+
+                // make sure we don't return arrays [null, null, null]
+                if (nullCount == 0) {
+                    yield null;
+                }
+
+                yield result.isEmpty() ? null : result;
             }
-            default -> null;
+            default -> isOriginal ? x : null;
         };
     }
 }

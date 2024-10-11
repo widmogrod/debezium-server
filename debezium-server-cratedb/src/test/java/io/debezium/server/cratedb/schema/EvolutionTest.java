@@ -159,21 +159,35 @@ class EvolutionTest {
                         PartialValue.of(2, "23"),
                         3
                 ),
+                "list2", List.of(1, 2, 3),
+                "map", Map.of("x", Map.of("y", "q")),
                 "nested", PartialValue.of(null,
                         List.of(
-                                PartialValue.of(List.of(1,2,3), "[1,2,3]")
-                        ))
+                                1,
+                                PartialValue.of("[1,2,3]", List.of(1, 2, 3))
+                        )),
+                "some", PartialValue.of(null, Map.of(
+                        "a", "first",
+                        "b", PartialValue.of(null, "bee")
+                ))
         );
 
-        var result =  Evolution.extractNonCasted(given);
+        var result = Evolution.extractNonCasted(given);
         assertThat(result).isEqualTo(Map.of(
                 "name", 666,
-                "list", new ArrayList(){{
+                "list", new ArrayList() {{
                     add(null);
                     add("23");
                     add(null);
                 }},
-                "nested", List.of("[1,2,3]")
+                "nested", new ArrayList() {{
+                    add(1);
+                    add(List.of(1, 2, 3));
+                }},
+                "some", Map.of(
+                        "a", "first",
+                        "b", "bee"
+                )
         ));
     }
 }
