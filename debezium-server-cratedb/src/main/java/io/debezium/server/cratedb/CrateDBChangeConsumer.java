@@ -57,8 +57,24 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     private static final Logger LOGGER = LoggerFactory.getLogger(CrateDBChangeConsumer.class);
 
     // SQL statements used to interact with the CrateDB
-    private static final String SQL_CREATE_TABLE = "CREATE TABLE IF NOT EXISTS %s (id varchar PRIMARY KEY, doc OBJECT) WITH (\"mapping.total_fields.limit\" = 20000)";
-    private static final String SQL_UPSERT = "INSERT INTO %s (id, doc) VALUES (?::varchar, ?::JSON) ON CONFLICT (id) DO UPDATE SET doc = excluded.doc";
+    private static final String SQL_CREATE_TABLE = """
+            CREATE TABLE IF NOT EXISTS %s (
+                id varchar PRIMARY KEY,
+                doc OBJECT,
+                malformed OBJECT AS (
+                    doc OBJECT(IGNORED),
+                    msg TEXT
+                )
+            )
+            WITH ("mapping.total_fields.limit" = 20000)
+            """;
+    private static final String SQL_UPSERT = """
+            INSERT INTO %s (id, doc, malformed)
+            VALUES (?::varchar, ?::JSON, ?::JSON)
+            ON CONFLICT (id) DO UPDATE
+                SET doc = excluded.doc
+                  , malformed = excluded.malformed
+            """;
     private static final String SQL_DELETE = "DELETE FROM %s WHERE id = ?::varchar";
 
     // Prefix for the configuration properties
@@ -77,6 +93,11 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     // Configuration properties
     @ConfigProperty(name = PROP_PREFIX + "connection_url")
     String url;
+
+    @ConfigProperty(name = PROP_PREFIX + "type-conflict-strategy", defaultValue = TypeConflictResolution.NAME_SILENT_NULL)
+    String strategyName;
+
+    private TypeConflictResolution.Strategy strategyType;
 
     // Database connection
     private Connection conn = null;
@@ -141,6 +162,11 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         serdeValue.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 
+    @PostConstruct
+    void setupConflictStrategy() {
+        strategyType = TypeConflictResolution.fromString(strategyName);
+    }
+
     @Override
     public void handleBatch(List<ChangeEvent<Object, Object>> records, RecordCommitter<ChangeEvent<Object, Object>> committer) throws InterruptedException {
         LOGGER.info("handleBatch of size {}", records.size());
@@ -201,7 +227,8 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                             schema0 = schema1;
                             tablesSchema.put(tableId, schema1);
                             // use final representation of object as something we will insert into database
-                            String recordDoc = getRecordDoc(object1);
+                            String recordDoc = getRecordDoc(schema1, object1);
+                            String malformedDoc = getMalformedDoc(schema1, object1);
 
                             if (stmtUpsert == null) {
                                 String upsert = SQL_UPSERT.formatted(tableId);
@@ -209,6 +236,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                             }
                             stmtUpsert.setString(1, recordId);
                             stmtUpsert.setString(2, recordDoc);
+                            stmtUpsert.setString(3, malformedDoc);
                             stmtUpsert.addBatch();
                             break;
 
@@ -244,12 +272,14 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                                 var schema00 = tablesSchema.get(tableId);
                                 var object00 = getRecordObject(element.getValue());
                                 var result00 = Evolution.fromObject(schema00, object00);
-                                var recordDoc = getRecordDoc(result00.getRight());
+                                var recordDoc = getRecordDoc(schema00, result00.getRight());
+                                var malformedDoc = getMalformedDoc(schema00, result00.getRight());
 
                                 String upsert = SQL_UPSERT.formatted(tableId);
                                 var stmt = conn.prepareStatement(upsert);
                                 stmt.setString(1, recordId);
                                 stmt.setString(2, recordDoc);
+                                stmt.setString(3, malformedDoc);
                                 stmt.execute();
                             }
                             catch (SQLException | IOException e) {
@@ -346,9 +376,32 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         return operation;
     }
 
-    private String getRecordDoc(Object object) {
+    private String getRecordDoc(Schema.I schema, Object object) {
         try {
+            if (strategyType == TypeConflictResolution.Strategy.TYPE_SUFFIX_AND_MALFORMED) {
+                object = Evolution.typeSuffix(schema, object);
+            }
+
             return convertToJson(object);
+        }
+        catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String getMalformedDoc(Schema.I schema, Object object) {
+        try {
+            return switch (strategyType) {
+                case STORE_MALFORMED_FRAGMENTS, TYPE_SUFFIX_AND_MALFORMED -> convertToJson(
+                        new HashMap<>() {{
+                            var doc = Evolution.extractNonCasted(object);
+                            put("doc", doc);
+                            put("msg", null);
+                        }}
+                );
+
+                default -> null;
+            };
         }
         catch (JsonProcessingException e) {
             throw new RuntimeException(e);

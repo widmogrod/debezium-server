@@ -26,6 +26,7 @@ public class Profile {
             Map<String, String> params = new ConcurrentHashMap<>();
 
             params.put("debezium.sink.type", "cratedb");
+            params.put("debezium.sink.cratedb.type-conflict-strategy", TypeConflictResolution.NAME_STORE_MALFORMED_FRAGMENTS);
             // Other params from CrateTestResourceLifecycleManager:
             // - "debezium.sink.cratedb.connection_url"
 

@@ -89,6 +89,7 @@ public class PostgresCrateDBIT {
                 .containsEntry("transforms.unwrap.type", "io.debezium.transforms.ExtractNewRecordState")
                 .containsEntry("transforms.unwrap.add.headers", "op")
                 .containsEntry("transforms.unwrap.drop.tombstones", "false")
+                .containsEntry("offset.storage.cratedb.type-conflict-strategy", "malformed")
                 .containsEntry("offset.storage.cratedb.connection_url", CrateTestResourceLifecycleManager.getUrl());
     }
 
@@ -132,7 +133,7 @@ public class PostgresCrateDBIT {
     }
 
     @Test
-    void testPostgresCustomTableAndInsertsAndDeletes() throws SQLException, JsonProcessingException {
+    void testPostgresCustomTableAndInsertsAndDeletes() {
         Testing.Print.enable();
 
         Awaitility.await().atMost(Duration.ofSeconds(Profile.waitForSeconds())).until(() -> {
@@ -260,18 +261,25 @@ public class PostgresCrateDBIT {
             });
 
             List<Object> results = new ArrayList<>();
-            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_cratedb_test ORDER BY id ASC;");
+            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc, malformed FROM testc_inventory_cratedb_test ORDER BY id ASC;");
             while (itemsSet.next()) {
                 String id = itemsSet.getString(1);
                 String docJson = itemsSet.getString(2);
-                Map doc = new ObjectMapper().readValue(docJson, Map.class);
-                results.add(Map.of("id", id, "doc", doc));
+                String malformedJson = itemsSet.getString(3);
+                // prepare data
+                var doc = new ObjectMapper().readValue(docJson, Map.class);
+                var malformed = malformedJson == null ? null : new ObjectMapper().readValue(malformedJson, Map.class);
+                // build final representation
+                results.add(
+                        new HashMap<>() {{
+                            put("id", id);
+                            put("doc", doc);
+                            put("malformed", (malformed != null && malformed.isEmpty()) ? null : malformed);
+                        }}
+                );
             }
             itemsSet.close();
 
-            // TODO: figure out how to include schema changes
-            // current Debezium settings don't stream schema changes
-            // and CrateDB don't have some of the operations like change type of a column
             List<HashMap<String, Object>> expectedResults = new ArrayList<>() {
                 {
                     add(new HashMap<>() {
@@ -283,6 +291,7 @@ public class PostgresCrateDBIT {
                                     put("id", 2);
                                 }
                             });
+                            put("malformed", null);
                         }
                     });
                     add(new HashMap<>() {
@@ -294,6 +303,7 @@ public class PostgresCrateDBIT {
                                     put("id", 3);
                                 }
                             });
+                            put("malformed", null);
                         }
                     });
                     add(new HashMap<>() {
@@ -306,6 +316,7 @@ public class PostgresCrateDBIT {
                                     put("new_col", "new data");
                                 }
                             });
+                            put("malformed", null);
                         }
                     });
                     add(new HashMap<>() {
@@ -318,6 +329,7 @@ public class PostgresCrateDBIT {
                                     put("new_col", "new description ");
                                 }
                             });
+                            put("malformed", null);
                         }
                     });
                     add(new HashMap<>() {
@@ -329,6 +341,11 @@ public class PostgresCrateDBIT {
                                     put("new_col", "7");
                                 }
                             });
+                            put("malformed", Map.of(
+                                    "doc", Map.of(
+                                            "new_col", 7
+                                    )
+                            ));
                         }
                     });
                     add(new HashMap<>() {
@@ -340,6 +357,11 @@ public class PostgresCrateDBIT {
                                     put("new_col", "[1.1, 2.2, 3.3]");
                                 }
                             });
+                            put("malformed",  Map.of(
+                                    "doc", Map.of(
+                                            "new_col", List.of(1.1, 2.2, 3.3)
+                                    )
+                            ));
                         }
                     });
                 }
