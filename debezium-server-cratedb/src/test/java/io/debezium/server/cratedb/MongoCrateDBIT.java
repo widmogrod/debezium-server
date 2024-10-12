@@ -14,12 +14,16 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.debezium.server.cratedb.datagen.DataGen;
 import jakarta.inject.Inject;
 
 import org.awaitility.Awaitility;
@@ -28,6 +32,7 @@ import org.bson.types.Decimal128;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
@@ -116,7 +121,7 @@ public class MongoCrateDBIT {
         document1.append("_id", new ObjectId("6707c4703ceb57275d16037e"))
                 .append("array", Arrays.asList(53, 76, 55))
                 .append("boolean", false)
-                .append("date", java.util.Date.from(java.time.LocalDate.of(2024, java.time.Month.OCTOBER, 10).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant()))
+                .append("date", Date.from(LocalDate.of(2024, java.time.Month.OCTOBER, 10).atStartOfDay(ZoneId.systemDefault()).toInstant()))
                 .append("decimal", new Decimal128(new BigDecimal("18.261063697793077")))
                 .append("double", 24.59059419857732)
                 .append("int", 72)
@@ -133,7 +138,7 @@ public class MongoCrateDBIT {
         document2.append("_id", new ObjectId("6707c4703ceb57275d16037f"))
                 .append("array", Arrays.asList(37, 65, 90))
                 .append("boolean", true)
-                .append("date", java.util.Date.from(java.time.LocalDate.of(2024, java.time.Month.OCTOBER, 10).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant()))
+                .append("date", Date.from(LocalDate.of(2024, java.time.Month.OCTOBER, 10).atStartOfDay(ZoneId.systemDefault()).toInstant()))
                 .append("decimal", new Decimal128(new BigDecimal("86.9112949809932")))
                 .append("double", 12.031154844035463)
                 .append("int", 50)
@@ -221,7 +226,8 @@ public class MongoCrateDBIT {
                                 // INFO: this field is null, because name in first record is int, and in second string
                                 // this result in type collision, and default behaviour instead of failing whole record
                                 // make all the effort to save values
-                                // put("name", null);
+                                // INFO2: this test acts flacy, sometimes this values does not exists...
+                                put("name", null);
                             }
                         });
                         put("string", "2cbde6de-8b72-4763-9364-15cc6fe5ca05");
@@ -231,5 +237,32 @@ public class MongoCrateDBIT {
         };
         expected.add(secondMap);
         assertThat(results).isEqualTo(expected);
+    }
+
+    @Test
+    @Disabled
+    void testLoadTableWithMessyData() {
+        var db = mongo.getDatabase("testdb");
+        var coll = db.getCollection("testcollection2");
+
+        var docs = new ArrayList<Document>();
+        for (var i = 0; i < 1000; i++) {
+            var object1 = DataGen.generateObject();
+            var document1 = new Document();
+            document1
+                    .append("array", DataGen.generateList())
+                    .append("boolean", false)
+                    .append("date", Date.from(LocalDate.of(2024, java.time.Month.OCTOBER, 10).atStartOfDay(ZoneId.systemDefault()).toInstant()))
+                    .append("decimal", new Decimal128(new BigDecimal("18.261063697793077")))
+                    .append("double", 24.59059419857732)
+                    .append("int", 72)
+                    .append("long", 5997345523540356169L)
+                    .append("null", null)
+                    .append("obj", object1)
+                    .append("string", new ObjectId().toHexString());
+            docs.add(document1);
+        }
+        var result = coll.insertMany(docs);
+        assertThat(result.wasAcknowledged()).isTrue();
     }
 }
