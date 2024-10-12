@@ -33,7 +33,7 @@ public class Profile {
             params.put("debezium.transforms", "unwrap");
             params.put("debezium.transforms.unwrap.type", "io.debezium.transforms.ExtractNewRecordState");
             params.put("debezium.transforms.unwrap.add.headers", "op");
-            params.put("debezium.transforms.unwrap.drop.tombstones", "false");
+            params.put("debezium.transforms.unwrap.delete.tombstone.handling.mode", "tombstone");
 
             // Other params like username, port, etc be taken from PostgresTestResourceLifecycleManager
             // - "debezium.source.database.user"
