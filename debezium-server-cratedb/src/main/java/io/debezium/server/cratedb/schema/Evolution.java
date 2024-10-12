@@ -33,12 +33,17 @@ public class Evolution {
         }
 
         return switch (object) {
+            case null -> Pair.of(schema, null);
             case Long ignored -> switch (schema) {
                 case Schema.Primitive.BIGINT -> Pair.of(schema, object);
                 default -> fallbackToTryCast(schema, object);
             };
             case Integer ignored -> switch (schema) {
                 case Schema.Primitive.BIGINT -> Pair.of(schema, object);
+                default -> fallbackToTryCast(schema, object);
+            };
+            case Float ignored -> switch (schema) {
+                case Schema.Primitive.DOUBLE -> Pair.of(schema, object);
                 default -> fallbackToTryCast(schema, object);
             };
             case Double ignored -> switch (schema) {
@@ -542,9 +547,11 @@ public class Evolution {
 
     public static Schema.I detectType(Object fieldValue) {
         return switch (fieldValue) {
+            case null -> Schema.Primitive.NULL;
             case String ignored -> Schema.Primitive.TEXT;
             case Integer ignored -> Schema.Primitive.BIGINT;
             case Long ignored -> Schema.Primitive.BIGINT;
+            case Float ignored -> Schema.Primitive.DOUBLE;
             case Double ignored -> Schema.Primitive.DOUBLE;
             case Boolean ignored -> Schema.Primitive.BOOLEAN;
             case Date ignored -> Schema.Primitive.BIGINT;
@@ -721,7 +728,7 @@ public class Evolution {
             }
         }
 
-        return a.equals(b);
+        return Objects.equals(a, b);
     }
 
     public static Object extractNonCasted(Object x) {
@@ -730,6 +737,7 @@ public class Evolution {
 
     public static Object extractNonCasted(Object x, boolean isOriginal) {
         return switch (x) {
+            case null -> null;
             case PartialValue(Object ignored, Object original) -> switch (original) {
                 case String s -> s;
                 case Number n -> n;
