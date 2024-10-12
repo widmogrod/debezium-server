@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import io.debezium.DebeziumException;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.Dependent;
@@ -124,24 +125,25 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             // check if is connected
             if (conn.isClosed()) {
                 LOGGER.error("Driver connection is closed");
-                throw new RuntimeException("Driver connection is closed");
+                throw new DebeziumException("Driver connection is closed");
             }
 
             ResultSet pingStmt = conn.createStatement().executeQuery("SELECT 1");
             if (!pingStmt.next()) {
                 LOGGER.error("Ping query returned no results");
-                throw new RuntimeException("Ping query returned no results");
+                throw new DebeziumException("Ping query returned no results");
             }
 
             if (pingStmt.getInt(1) != 1) {
                 LOGGER.error("Ping query returned '{}' but expected 1", pingStmt.getInt(0));
-                throw new RuntimeException("Ping query returned '" + pingStmt.getString(0) + "' but expected 1");
+                throw new DebeziumException("Ping query returned '" + pingStmt.getString(0) + "' but expected 1");
             }
 
             LOGGER.info("Connected");
         }
         catch (SQLException e) {
-            throw new RuntimeException("Failed to initialise connection to CrateDB", e);
+            conn = null;
+            throw new DebeziumException("Failed to initialise connection to CrateDB", e);
         }
     }
 
@@ -151,12 +153,14 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         try {
             if (conn != null) {
                 conn.close();
-                conn = null;
                 LOGGER.info("closed connection");
             }
         }
         catch (Exception e) {
             LOGGER.warn("Exception while closing cratedb client: {}", e.toString());
+        }
+        finally {
+            conn = null;
         }
     }
 
@@ -188,7 +192,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 recordMap.computeIfAbsent(tableId, k -> new LinkedHashMap<>()).put(recordId, record);
             }
             catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
+                throw new DebeziumException("Failure during deduplication of batch", e);
             }
         }
 
@@ -264,7 +268,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 }
                 catch (SQLException | IOException e) {
                     closeStatements(stmtUpsert, stmtDelete);
-                    throw new RuntimeException("Failed in prepare", e);
+                    throw new DebeziumException("Failed in preparing and batching", e);
                 }
             }
 
@@ -291,7 +295,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                                     stmt.execute();
                                 }
                             }
-                            catch (SQLException | IOException | RuntimeException e) {
+                            catch (SQLException | IOException  e) {
                                 try {
                                     String upsert = SQL_UPSERT_MALFORMED.formatted(tableId);
                                     try (var stmt = conn.prepareStatement(upsert)) {
@@ -300,7 +304,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                                         stmt.execute();
                                     }
                                 }
-                                catch (SQLException | RuntimeException e2) {
+                                catch (SQLException e2) {
                                     LOGGER.warn("Failed to upsert record tableId={} id={} code={}, exception={}, previous exception={}",
                                             tableId, recordId, processed[i], e2.getMessage(), e.getMessage());
                                 }
@@ -330,7 +334,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                                         stmt.execute();
                                     }
                                 }
-                                catch (SQLException | RuntimeException e2) {
+                                catch (SQLException e2) {
                                     LOGGER.warn("Failed to delete record tableId={} id={} code={}, exception={} previous exception={}",
                                             tableId, recordId, processed[i], e2.getMessage(), e.getMessage());
                                 }
@@ -340,7 +344,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 }
             }
             catch (SQLException e) {
-                throw new RuntimeException("Failed in batch", e);
+                throw new DebeziumException("Failed in executing batch", e);
             }
             finally {
                 closeStatements(stmtUpsert, stmtDelete);
@@ -415,7 +419,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             return convertToJson(object);
         }
         catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new DebeziumException("Failed serialize document to JSON", e);
         }
     }
 
@@ -434,7 +438,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             };
         }
         catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new DebeziumException("Failed serialize malformed document as JSON", e);
         }
     }
 
@@ -446,7 +450,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             }});
         }
         catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new DebeziumException("Failed serialize malformed exception as JSON", e);
         }
     }
 
@@ -463,7 +467,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             }
         }
         catch (SQLException e) {
-            throw new RuntimeException(e);
+            throw new DebeziumException("Failed create table '%s'".formatted(tableId), e);
         }
     }
 
