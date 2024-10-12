@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import io.debezium.embedded.EmbeddedEngineChangeEvent;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.Dependent;
@@ -78,7 +79,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                   , err = excluded.err
             """;
     public static final String SQL_UPSERT_ERR = """
-            INSERT INTO %s (id, malformed)
+            INSERT INTO %s (id, err)
             VALUES (?::varchar, ?::TEXT)
             ON CONFLICT (id) DO UPDATE
                 SET err = excluded.err
@@ -197,6 +198,9 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
             PreparedStatement stmtUpsert = null;
             PreparedStatement stmtDelete = null;
+            // store position of inserts and updates for retry logic
+            Map<Number, String> insertPositionToRecordId = new HashMap<>();
+            Map<Number, String> deletePositionToRecordId = new HashMap<>();
 
             // Retrieve schema definition
             Schema.I schema0;
@@ -225,6 +229,8 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 try {
                     switch (operation) {
                         case "c", "r", "u":
+                            insertPositionToRecordId.put(insertPositionToRecordId.size(), recordId);
+
                             var object0 = getRecordObject(record);
                             var result = Evolution.fromObject(schema0, object0);
                             var schema1 = result.getLeft();
@@ -247,6 +253,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                             break;
 
                         case "d":
+                            deletePositionToRecordId.put(deletePositionToRecordId.size(), recordId);
                             if (stmtDelete == null) {
                                 String delete = SQL_DELETE.formatted(tableId);
                                 stmtDelete = conn.prepareStatement(delete);
@@ -271,8 +278,8 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                     int[] processed = stmtUpsert.executeBatch();
                     for (int i = 0; i < processed.length; i++) {
                         if (processed[i] != 1) {
-                            var element = tableRows.stream().toList().get(i);
-                            String recordId = element.getKey();
+                            String recordId = insertPositionToRecordId.get(i);
+                            var element = tableRows.stream().filter((v) -> v.getKey().equals(recordId)).findFirst().get();
 
                             try {
                                 var schema00 = tablesSchema.get(tableId);
@@ -309,9 +316,9 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                 if (stmtDelete != null) {
                     int[] processed = stmtDelete.executeBatch();
                     for (int i = 0; i < processed.length; i++) {
-                        if (processed[i] != 1) {
-                            var element = tableRows.stream().toList().get(i);
-                            String recordId = element.getKey();
+                        // previously was != 1, but it looks like every delete returns 0
+                        if (processed[i] != 0) {
+                            String recordId = deletePositionToRecordId.get(i);
                             try {
                                 String delete = SQL_DELETE.formatted(tableId);
                                 try (var stmt = conn.prepareStatement(delete)) {
@@ -375,7 +382,12 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     private Object getRecordObject(ChangeEvent<Object, Object> record) throws IOException {
         Object value = record.value();
         if (value == null) {
-            return value;
+            return null;
+        }
+
+        if (record instanceof EmbeddedEngineChangeEvent<?, ?, ?> che) {
+            var source = che.sourceRecord();
+            return KafkaDataToJavaLangConverter.convertToJavaObject(source.valueSchema(), source.value());
         }
 
         var bytes = getBytes(value);
@@ -421,7 +433,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         try {
             return switch (getStrategyType()) {
                 case STORE_MALFORMED_FRAGMENTS, TYPE_SUFFIX_AND_MALFORMED ->
-                        convertToJson(Evolution.extractNonCasted(object));
+                    convertToJson(Evolution.extractNonCasted(object));
 
                 default -> null;
             };
