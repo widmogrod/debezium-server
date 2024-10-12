@@ -159,7 +159,7 @@ public class Diff {
     }
 
     private static String padLeft(Integer level, String text) {
-        var indent = "  " .repeat(level);
+        var indent = "  ".repeat(level);
         return text.lines()
                 .map(line -> indent + line)
                 .collect(Collectors.joining("\n"));

@@ -271,12 +271,13 @@ public class PostgresCrateDBIT {
                 var malformed = malformedJson == null ? null : new ObjectMapper().readValue(malformedJson, Map.class);
                 // build final representation
                 results.add(
-                        new HashMap<>() {{
-                            put("id", id);
-                            put("doc", doc);
-                            put("malformed", (malformed != null && malformed.isEmpty()) ? null : malformed);
-                        }}
-                );
+                        new HashMap<>() {
+                            {
+                                put("id", id);
+                                put("doc", doc);
+                                put("malformed", (malformed != null && malformed.isEmpty()) ? null : malformed);
+                            }
+                        });
             }
             itemsSet.close();
 
@@ -343,9 +344,7 @@ public class PostgresCrateDBIT {
                             });
                             put("malformed", Map.of(
                                     "doc", Map.of(
-                                            "new_col", 7
-                                    )
-                            ));
+                                            "new_col", 7)));
                         }
                     });
                     add(new HashMap<>() {
@@ -357,11 +356,9 @@ public class PostgresCrateDBIT {
                                     put("new_col", "[1.1, 2.2, 3.3]");
                                 }
                             });
-                            put("malformed",  Map.of(
+                            put("malformed", Map.of(
                                     "doc", Map.of(
-                                            "new_col", List.of(1.1, 2.2, 3.3)
-                                    )
-                            ));
+                                            "new_col", List.of(1.1, 2.2, 3.3))));
                         }
                     });
                 }

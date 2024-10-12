@@ -135,10 +135,7 @@ class EvolutionTest {
                 "list", Schema.Array.of(
                         Schema.Coli.of(
                                 Schema.Primitive.TIMETZ,
-                                Schema.Primitive.BOOLEAN
-                        )
-                )
-        );
+                                Schema.Primitive.BOOLEAN)));
 
         Schema.I schema2 = Schema.Dict.of(
                 "=", Schema.Primitive.DOUBLE,
@@ -155,49 +152,51 @@ class EvolutionTest {
                 ">=", Schema.Primitive.DOUBLE,
                 "?", Schema.Primitive.DOUBLE,
                 "list", Schema.Array.of(
-                        Schema.Primitive.TIMETZ
-                )
-        );
+                        Schema.Primitive.TIMETZ));
 
         var diff = Diff.compare(schema1, schema2);
         System.out.println(Diff.prettyPrint(diff));
 
-        assertThat(diff).usingRecursiveAssertion().isEqualTo(new Diff.ChangeSet(schema1, new HashSet<>() {{
-            add(new Diff.ChangeSet.Positional("=", new Diff.ChangeSet.Nested(
-                    new Diff.ChangeSet(Schema.Primitive.DOUBLE, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.DOUBLE))))));
-            add(new Diff.ChangeSet.Positional("smallint", new Diff.ChangeSet.Nested(
-                    new Diff.ChangeSet(Evolution.fromPath(List.of("smallint"), schema1).get(), Set.of(
-                            new Diff.ChangeSet.Positional("lucky", new Diff.ChangeSet.Nested(
-                                    new Diff.ChangeSet(Schema.Primitive.BIGINT, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.BIGINT))))),
-                            new Diff.ChangeSet.Positional("truth", new Diff.ChangeSet.Nested(
-                                    new Diff.ChangeSet(Schema.Primitive.BOOLEAN, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.BOOLEAN)))))
-                    )))));
-            add(new Diff.ChangeSet.Positional("name_@", new Diff.ChangeSet.Nested(
-                    new Diff.ChangeSet(Evolution.fromPath(List.of("name_@"), schema1).get(), Set.of(
-                            new Diff.ChangeSet.Positional("lucky", new Diff.ChangeSet.Nested(new Diff.ChangeSet(Schema.Primitive.BIGINT, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.BIGINT))))),
-                            new Diff.ChangeSet.Positional("truth", new Diff.ChangeSet.Nested(new Diff.ChangeSet(Schema.Primitive.BOOLEAN, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.BOOLEAN)))))
-                    )))));
-            add(new Diff.ChangeSet.Positional("name", new Diff.ChangeSet.Nested(
-                    new Diff.ChangeSet(Evolution.fromPath(List.of("name"), schema1).get(), Set.of(
-                            new Diff.ChangeSet.Removed(Evolution.fromPath(List.of("name"), schema1).get()),
-                            new Diff.ChangeSet.Added(Schema.Primitive.TEXT)
-                    )))));
-            add(new Diff.ChangeSet.Positional("name_timestamp without time zone", new Diff.ChangeSet.Nested(
-                    new Diff.ChangeSet(Evolution.fromPath(List.of("name_timestamp without time zone"), schema1).get(), Set.of(
-                            new Diff.ChangeSet.Positional("lucky", new Diff.ChangeSet.Nested(new Diff.ChangeSet(Schema.Primitive.BIGINT, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.BIGINT))))),
-                            new Diff.ChangeSet.Positional("truth", new Diff.ChangeSet.Nested(new Diff.ChangeSet(Schema.Primitive.BOOLEAN, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.BOOLEAN)))))
-                    )))));
-            add(new Diff.ChangeSet.Positional(">=", new Diff.ChangeSet.Nested(new Diff.ChangeSet(Schema.Primitive.DOUBLE, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.DOUBLE))))));
-            add(new Diff.ChangeSet.Positional("?", new Diff.ChangeSet.Nested(new Diff.ChangeSet(Schema.Primitive.DOUBLE, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.DOUBLE))))));
-            add(new Diff.ChangeSet.Positional("list", new Diff.ChangeSet.Nested(
-                    new Diff.ChangeSet(Evolution.fromPath(List.of("list"), schema1).get(), Set.of(
-                            new Diff.ChangeSet.Positional("[]", new Diff.ChangeSet.Nested(
-                                    new Diff.ChangeSet(Evolution.fromPath(List.of("list", "*"), schema1).get(), Set.of(
-                                            new Diff.ChangeSet.Removed(Evolution.fromPath(List.of("list", "*"), schema1).get()),
-                                            new Diff.ChangeSet.Added(Schema.Primitive.TIMETZ)
-                                    )))
-                            ))))));
-        }}));
+        assertThat(diff).usingRecursiveAssertion().isEqualTo(new Diff.ChangeSet(schema1, new HashSet<>() {
+            {
+                add(new Diff.ChangeSet.Positional("=", new Diff.ChangeSet.Nested(
+                        new Diff.ChangeSet(Schema.Primitive.DOUBLE, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.DOUBLE))))));
+                add(new Diff.ChangeSet.Positional("smallint", new Diff.ChangeSet.Nested(
+                        new Diff.ChangeSet(Evolution.fromPath(List.of("smallint"), schema1).get(), Set.of(
+                                new Diff.ChangeSet.Positional("lucky", new Diff.ChangeSet.Nested(
+                                        new Diff.ChangeSet(Schema.Primitive.BIGINT, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.BIGINT))))),
+                                new Diff.ChangeSet.Positional("truth", new Diff.ChangeSet.Nested(
+                                        new Diff.ChangeSet(Schema.Primitive.BOOLEAN, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.BOOLEAN))))))))));
+                add(new Diff.ChangeSet.Positional("name_@", new Diff.ChangeSet.Nested(
+                        new Diff.ChangeSet(Evolution.fromPath(List.of("name_@"), schema1).get(), Set.of(
+                                new Diff.ChangeSet.Positional("lucky",
+                                        new Diff.ChangeSet.Nested(
+                                                new Diff.ChangeSet(Schema.Primitive.BIGINT, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.BIGINT))))),
+                                new Diff.ChangeSet.Positional("truth", new Diff.ChangeSet.Nested(
+                                        new Diff.ChangeSet(Schema.Primitive.BOOLEAN, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.BOOLEAN))))))))));
+                add(new Diff.ChangeSet.Positional("name", new Diff.ChangeSet.Nested(
+                        new Diff.ChangeSet(Evolution.fromPath(List.of("name"), schema1).get(), Set.of(
+                                new Diff.ChangeSet.Removed(Evolution.fromPath(List.of("name"), schema1).get()),
+                                new Diff.ChangeSet.Added(Schema.Primitive.TEXT))))));
+                add(new Diff.ChangeSet.Positional("name_timestamp without time zone", new Diff.ChangeSet.Nested(
+                        new Diff.ChangeSet(Evolution.fromPath(List.of("name_timestamp without time zone"), schema1).get(), Set.of(
+                                new Diff.ChangeSet.Positional("lucky",
+                                        new Diff.ChangeSet.Nested(
+                                                new Diff.ChangeSet(Schema.Primitive.BIGINT, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.BIGINT))))),
+                                new Diff.ChangeSet.Positional("truth", new Diff.ChangeSet.Nested(
+                                        new Diff.ChangeSet(Schema.Primitive.BOOLEAN, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.BOOLEAN))))))))));
+                add(new Diff.ChangeSet.Positional(">=",
+                        new Diff.ChangeSet.Nested(new Diff.ChangeSet(Schema.Primitive.DOUBLE, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.DOUBLE))))));
+                add(new Diff.ChangeSet.Positional("?",
+                        new Diff.ChangeSet.Nested(new Diff.ChangeSet(Schema.Primitive.DOUBLE, Set.of(new Diff.ChangeSet.Unchanged(Schema.Primitive.DOUBLE))))));
+                add(new Diff.ChangeSet.Positional("list", new Diff.ChangeSet.Nested(
+                        new Diff.ChangeSet(Evolution.fromPath(List.of("list"), schema1).get(), Set.of(
+                                new Diff.ChangeSet.Positional("[]", new Diff.ChangeSet.Nested(
+                                        new Diff.ChangeSet(Evolution.fromPath(List.of("list", "*"), schema1).get(), Set.of(
+                                                new Diff.ChangeSet.Removed(Evolution.fromPath(List.of("list", "*"), schema1).get()),
+                                                new Diff.ChangeSet.Added(Schema.Primitive.TIMETZ))))))))));
+            }
+        }));
 
         assertThat(Evolution.similar(schema1, schema2)).isTrue();
     }
@@ -210,37 +209,35 @@ class EvolutionTest {
                 "list", List.of(
                         1,
                         PartialValue.of(2, "23"),
-                        3
-                ),
+                        3),
                 "list2", List.of(1, 2, 3),
                 "map", Map.of("x", Map.of("y", "q")),
                 "nested", PartialValue.of(null,
                         List.of(
                                 1,
-                                PartialValue.of("[1,2,3]", List.of(1, 2, 3))
-                        )),
+                                PartialValue.of("[1,2,3]", List.of(1, 2, 3)))),
                 "some", PartialValue.of(null, Map.of(
                         "a", "first",
-                        "b", PartialValue.of(null, "bee")
-                ))
-        );
+                        "b", PartialValue.of(null, "bee"))));
 
         var result = Evolution.extractNonCasted(given);
         assertThat(result).isEqualTo(Map.of(
                 "name", 666,
-                "list", new ArrayList() {{
-                    add(null);
-                    add("23");
-                    add(null);
-                }},
-                "nested", new ArrayList() {{
-                    add(1);
-                    add(List.of(1, 2, 3));
-                }},
+                "list", new ArrayList() {
+                    {
+                        add(null);
+                        add("23");
+                        add(null);
+                    }
+                },
+                "nested", new ArrayList() {
+                    {
+                        add(1);
+                        add(List.of(1, 2, 3));
+                    }
+                },
                 "some", Map.of(
                         "a", "first",
-                        "b", "bee"
-                )
-        ));
+                        "b", "bee")));
     }
 }

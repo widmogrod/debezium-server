@@ -15,8 +15,6 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.debezium.server.cratedb.CrateDBChangeConsumer;
-import io.debezium.server.cratedb.schema.Diff;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,10 +24,12 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import io.debezium.server.cratedb.CrateDBChangeConsumer;
 import io.debezium.server.cratedb.CrateTestResourceLifecycleManager;
 import io.debezium.server.cratedb.Profile;
 import io.debezium.server.cratedb.datagen.DataGen;
 import io.debezium.server.cratedb.schema.CrateSQL;
+import io.debezium.server.cratedb.schema.Diff;
 import io.debezium.server.cratedb.schema.Evolution;
 import io.debezium.server.cratedb.schema.Schema;
 import io.quarkus.test.junit.QuarkusTest;

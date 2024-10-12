@@ -23,7 +23,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import io.debezium.DebeziumException;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.Dependent;
@@ -38,6 +37,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import io.debezium.DebeziumException;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.DebeziumEngine.RecordCommitter;
@@ -295,7 +295,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                                     stmt.execute();
                                 }
                             }
-                            catch (SQLException | IOException  e) {
+                            catch (SQLException | IOException e) {
                                 try {
                                     String upsert = SQL_UPSERT_MALFORMED.formatted(tableId);
                                     try (var stmt = conn.prepareStatement(upsert)) {
@@ -427,12 +427,13 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         try {
             return switch (strategyType) {
                 case STORE_MALFORMED_FRAGMENTS, TYPE_SUFFIX_AND_MALFORMED -> convertToJson(
-                        new HashMap<>() {{
-                            var doc = Evolution.extractNonCasted(object);
-                            put("doc", doc);
-                            put("msg", null);
-                        }}
-                );
+                        new HashMap<>() {
+                            {
+                                var doc = Evolution.extractNonCasted(object);
+                                put("doc", doc);
+                                put("msg", null);
+                            }
+                        });
 
                 default -> null;
             };
@@ -444,10 +445,12 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
     private String getMalformedDoc(Exception exception) {
         try {
-            return convertToJson(new HashMap<>() {{
-                // get only first line of the message
-                put("msg", Arrays.stream(exception.getMessage().split("\n")).limit(1).collect(Collectors.joining("\n")));
-            }});
+            return convertToJson(new HashMap<>() {
+                {
+                    // get only first line of the message
+                    put("msg", Arrays.stream(exception.getMessage().split("\n")).limit(1).collect(Collectors.joining("\n")));
+                }
+            });
         }
         catch (JsonProcessingException e) {
             throw new DebeziumException("Failed serialize malformed exception as JSON", e);

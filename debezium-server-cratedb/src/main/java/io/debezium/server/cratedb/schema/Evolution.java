@@ -5,8 +5,6 @@
  */
 package io.debezium.server.cratedb.schema;
 
-import org.apache.commons.lang3.tuple.Pair;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -20,6 +18,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Implementation of the schema evolution for CrateDB
@@ -177,7 +177,7 @@ public class Evolution {
             case null -> null;
             case Map map -> {
                 if (isDebeziumArrayDocument(map)) {
-                    yield ((Map<Object, Object>) map).entrySet().stream()
+                    yield((Map<Object, Object>) map).entrySet().stream()
                             .sorted(Comparator.comparing(entry -> entry.getKey().toString()))
                             .map((entry) -> dedebeziumArrayDocuments(entry.getValue()))
                             .collect(Collectors.toList());
@@ -675,7 +675,7 @@ public class Evolution {
                     if (fieldsB.containsKey(unsuffixedFieldName)) {
                         var bValue = fieldsB.get(unsuffixedFieldName);
                         if (bValue instanceof Schema.Coli bColi
-                          && bColi.set().contains(unsuffixedFieldType)) {
+                                && bColi.set().contains(unsuffixedFieldType)) {
                             continue;
                         }
                     }
