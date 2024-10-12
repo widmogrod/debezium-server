@@ -64,25 +64,24 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             CREATE TABLE IF NOT EXISTS %s (
                 id varchar PRIMARY KEY,
                 doc OBJECT,
-                malformed OBJECT AS (
-                    doc OBJECT(IGNORED),
-                    msg TEXT
-                )
+                malformed OBJECT(IGNORED),
+                err TEXT
             )
             WITH ("mapping.total_fields.limit" = 20000)
             """;
     public static final String SQL_UPSERT = """
-            INSERT INTO %s (id, doc, malformed)
-            VALUES (?::varchar, ?::JSON, ?::JSON)
+            INSERT INTO %s (id, doc, malformed, err)
+            VALUES (?::varchar, ?::JSON, ?::JSON, NULL)
             ON CONFLICT (id) DO UPDATE
                 SET doc = excluded.doc
                   , malformed = excluded.malformed
+                  , err = excluded.err
             """;
-    public static final String SQL_UPSERT_MALFORMED = """
+    public static final String SQL_UPSERT_ERR = """
             INSERT INTO %s (id, malformed)
-            VALUES (?::varchar, ?::JSON)
+            VALUES (?::varchar, ?::TEXT)
             ON CONFLICT (id) DO UPDATE
-                SET malformed = excluded.malformed
+                SET err = excluded.err
             """;
     public static final String SQL_DELETE = "DELETE FROM %s WHERE id = ?::varchar";
 
@@ -103,7 +102,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     @ConfigProperty(name = PROP_PREFIX + "connection_url")
     String url;
 
-    @ConfigProperty(name = PROP_PREFIX + "type-conflict-strategy", defaultValue = TypeConflictResolution.NAME_SILENT_NULL)
+    @ConfigProperty(name = PROP_PREFIX + "type_conflict_strategy", defaultValue = TypeConflictResolution.NAME_SILENT_NULL)
     String strategyName;
 
     private TypeConflictResolution.Strategy strategyType;
@@ -172,11 +171,6 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         serdeKey.configure(Collections.emptyMap(), true);
         // value will be deserialized as DebeziumMessage to properly handle insert update and delete
         serdeValue.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-    }
-
-    @PostConstruct
-    void setupConflictStrategy() {
-        strategyType = TypeConflictResolution.fromString(strategyName);
     }
 
     @Override
@@ -297,10 +291,10 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                             }
                             catch (SQLException | IOException e) {
                                 try {
-                                    String upsert = SQL_UPSERT_MALFORMED.formatted(tableId);
+                                    String upsert = SQL_UPSERT_ERR.formatted(tableId);
                                     try (var stmt = conn.prepareStatement(upsert)) {
                                         stmt.setString(1, recordId);
-                                        stmt.setString(2, getMalformedDoc(e));
+                                        stmt.setString(2, getErrorDoc(e));
                                         stmt.execute();
                                     }
                                 }
@@ -327,10 +321,10 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                             }
                             catch (SQLException e) {
                                 try {
-                                    String upsert = SQL_UPSERT_MALFORMED.formatted(tableId);
+                                    String upsert = SQL_UPSERT_ERR.formatted(tableId);
                                     try (var stmt = conn.prepareStatement(upsert)) {
                                         stmt.setString(1, recordId);
-                                        stmt.setString(2, getMalformedDoc(e));
+                                        stmt.setString(2, getErrorDoc(e));
                                         stmt.execute();
                                     }
                                 }
@@ -412,7 +406,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
     private String getRecordDoc(Schema.I schema, Object object) {
         try {
-            if (strategyType == TypeConflictResolution.Strategy.TYPE_SUFFIX_AND_MALFORMED) {
+            if (getStrategyType() == TypeConflictResolution.Strategy.TYPE_SUFFIX_AND_MALFORMED) {
                 object = Evolution.typeSuffix(schema, object);
             }
 
@@ -425,15 +419,9 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
     private String getMalformedDoc(Schema.I schema, Object object) {
         try {
-            return switch (strategyType) {
-                case STORE_MALFORMED_FRAGMENTS, TYPE_SUFFIX_AND_MALFORMED -> convertToJson(
-                        new HashMap<>() {
-                            {
-                                var doc = Evolution.extractNonCasted(object);
-                                put("doc", doc);
-                                put("msg", null);
-                            }
-                        });
+            return switch (getStrategyType()) {
+                case STORE_MALFORMED_FRAGMENTS, TYPE_SUFFIX_AND_MALFORMED ->
+                        convertToJson(Evolution.extractNonCasted(object));
 
                 default -> null;
             };
@@ -443,18 +431,8 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         }
     }
 
-    private String getMalformedDoc(Exception exception) {
-        try {
-            return convertToJson(new HashMap<>() {
-                {
-                    // get only first line of the message
-                    put("msg", Arrays.stream(exception.getMessage().split("\n")).limit(1).collect(Collectors.joining("\n")));
-                }
-            });
-        }
-        catch (JsonProcessingException e) {
-            throw new DebeziumException("Failed serialize malformed exception as JSON", e);
-        }
+    private String getErrorDoc(Exception exception) {
+        return Arrays.stream(exception.getMessage().split("\n")).limit(1).collect(Collectors.joining("\n"));
     }
 
     private void maybeCreateTable(String tableId) {
@@ -480,5 +458,14 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
     private String getTableId(ChangeEvent<Object, Object> record) {
         return streamNameMapper.map(record.destination());
+    }
+
+    private TypeConflictResolution.Strategy getStrategyType() {
+        if (strategyType == null) {
+            strategyType = TypeConflictResolution.fromString(strategyName);
+            LOGGER.info("Using strategy '{}'", TypeConflictResolution.stringify(strategyType));
+        }
+
+        return strategyType;
     }
 }
