@@ -9,6 +9,7 @@ import static io.debezium.server.cratedb.Profile.DEBEZIUM_SOURCE_MONGODB_CONNECT
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.sql.Array;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -88,7 +89,7 @@ public class PostgresCrateDBIT {
                 .containsEntry("transforms", "unwrap")
                 .containsEntry("transforms.unwrap.type", "io.debezium.transforms.ExtractNewRecordState")
                 .containsEntry("transforms.unwrap.add.headers", "op")
-                .containsEntry("transforms.unwrap.drop.tombstones", "false")
+                .containsEntry("transforms.unwrap.delete.tombstone.handling.mode", "tombstone")
                 .containsEntry("offset.storage.cratedb.type_conflict_strategy", "malformed")
                 .containsEntry("offset.storage.cratedb.connection_url", CrateTestResourceLifecycleManager.getUrl());
     }
@@ -167,6 +168,15 @@ public class PostgresCrateDBIT {
                              END;
                     """);
             connection.execute("INSERT INTO inventory.cratedb_test (id, new_col) VALUES (8, '{1.1, 2.2, 3.3}')");
+            // 7. let's add Dynamic nested arrays
+            connection.execute("ALTER TABLE inventory.cratedb_test ADD COLUMN dyn jsonb DEFAULT '[]'::jsonb");
+            connection.execute("INSERT INTO inventory.cratedb_test (id, dyn) VALUES (9, '[1, false, \"ok\"]'::jsonb)");
+            // 8. let's add nested arrays
+            connection.execute("ALTER TABLE inventory.cratedb_test ADD COLUMN nest integer[3][3]");
+            connection.execute("INSERT INTO inventory.cratedb_test (id, nest) VALUES (10, '{{1,2,3},{4,5,6},{7,8,9}}')");
+            // 9. let's add nested arrays now using jsonb type
+            connection.execute("ALTER TABLE inventory.cratedb_test ADD COLUMN nest2 jsonb");
+            connection.execute("INSERT INTO inventory.cratedb_test (id, nest2) VALUES (11, '[[1,2,3],[4,5,6],[7,8,9]]'::jsonb)");
 
             // Assert postgresql final state is as expected
             List<Object> resultPostgres = new ArrayList<>();
@@ -186,10 +196,39 @@ public class PostgresCrateDBIT {
                                     .collect(Collectors.toList());
                         }
 
+                        List dyn;
+                        try {
+                            dyn = new ObjectMapper().readValue(rs.getString("dyn"), ArrayList.class);
+                        }
+                        catch (JsonProcessingException e) {
+                            throw new RuntimeException(e);
+                        }
+
+                        Integer[][] nest = null;
+                        // Retrieve the 'nest' column value
+                        Array sqlArray = rs.getArray("nest");
+                        if (sqlArray != null) {
+                            nest = (Integer[][]) sqlArray.getArray();
+                        }
+
+                        List nest2 = null;
+                        try {
+                            var next2str = rs.getString("nest2");
+                            if (next2str != null) {
+                                nest2 = new ObjectMapper().readValue(next2str, ArrayList.class);
+                            }
+                        }
+                        catch (JsonProcessingException e) {
+                            throw new RuntimeException(e);
+                        }
+
                         var record = new HashMap<String, Object>();
                         record.put("id", id);
                         record.put("descr", descr);
                         record.put("new_col", newCol);
+                        record.put("dyn", dyn);
+                        record.put("nest", nest);
+                        record.put("nest2", nest2);
                         resultPostgres.add(record);
                     }
                 }
@@ -203,6 +242,9 @@ public class PostgresCrateDBIT {
                             put("descr", "hello 2");
                             put("id", 2);
                             put("new_col", null);
+                            put("dyn", List.of());
+                            put("nest", null);
+                            put("nest2", null);
                         }
                     },
                     new HashMap<String, Object>() {
@@ -210,6 +252,9 @@ public class PostgresCrateDBIT {
                             put("descr", "hello 33");
                             put("id", 3);
                             put("new_col", null);
+                            put("dyn", List.of());
+                            put("nest", null);
+                            put("nest2", null);
                         }
                     },
                     new HashMap<String, Object>() {
@@ -217,6 +262,9 @@ public class PostgresCrateDBIT {
                             put("descr", "hello 4");
                             put("id", 4);
                             put("new_col", null);
+                            put("dyn", List.of());
+                            put("nest", null);
+                            put("nest2", null);
                         }
                     },
                     new HashMap<String, Object>() {
@@ -224,6 +272,9 @@ public class PostgresCrateDBIT {
                             put("descr", "hello 5");
                             put("id", 5);
                             put("new_col", null);
+                            put("dyn", List.of());
+                            put("nest", null);
+                            put("nest2", null);
                         }
                     },
                     new HashMap<String, Object>() {
@@ -231,6 +282,9 @@ public class PostgresCrateDBIT {
                             put("descr", null);
                             put("id", 7);
                             put("new_col", List.of(7f));
+                            put("dyn", List.of());
+                            put("nest", null);
+                            put("nest2", null);
                         }
                     },
                     new HashMap<String, Object>() {
@@ -238,9 +292,42 @@ public class PostgresCrateDBIT {
                             put("descr", null);
                             put("id", 8);
                             put("new_col", List.of(1.1f, 2.2f, 3.3f));
+                            put("dyn", List.of());
+                            put("nest", null);
+                            put("nest2", null);
+                        }
+                    },
+                    new HashMap<String, Object>() {
+                        {
+                            put("descr", null);
+                            put("id", 9);
+                            put("new_col", null);
+                            put("dyn", List.of(1, false, "ok"));
+                            put("nest", null);
+                            put("nest2", null);
+                        }
+                    },
+                    new HashMap<String, Object>() {
+                        {
+                            put("descr", null);
+                            put("id", 10);
+                            put("new_col", null);
+                            put("dyn", List.of());
+                            put("nest", new Integer[][]{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}});
+                            put("nest2", null);
+                        }
+                    },
+                    new HashMap<String, Object>() {
+                        {
+                            put("descr", null);
+                            put("id", 11);
+                            put("new_col", null);
+                            put("dyn", List.of());
+                            put("nest", null);
+                            put("nest2", List.of(List.of(1, 2, 3), List.of(4, 5, 6), List.of(7, 8, 9)));
                         }
                     });
-            assertThat(resultPostgres).usingRecursiveAssertion().isEqualTo(expectedPostgresState);
+            assertThat(resultPostgres).usingRecursiveComparison().isEqualTo(expectedPostgresState);
 
             // Let's proceed with CrateDB
             Statement stmt = conn.createStatement();
@@ -253,7 +340,7 @@ public class PostgresCrateDBIT {
                     stmt.execute("REFRESH TABLE testc_inventory_cratedb_test;");
                     var result = stmt.executeQuery("SELECT COUNT(1) FROM testc_inventory_cratedb_test");
                     result.next();
-                    return result.getInt(1) == expectedPostgresState.size();
+                    return result.getInt(1) > 2;
                 }
                 catch (SQLException e) {
                     return false;
@@ -261,24 +348,26 @@ public class PostgresCrateDBIT {
             });
 
             List<Object> results = new ArrayList<>();
-            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc, malformed, err FROM testc_inventory_cratedb_test ORDER BY id ASC;");
+            // Order by doc['id'] instead of id, because id is "text" and CrateDB does not sort using lexicographical sort, and id="10" is on first position instead on last.
+            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc, malformed, err FROM testc_inventory_cratedb_test ORDER BY doc['id'] ASC;");
             while (itemsSet.next()) {
                 String id = itemsSet.getString(1);
                 String docJson = itemsSet.getString(2);
                 String malformedJson = itemsSet.getString(3);
                 String errText = itemsSet.getString(4);
                 // prepare data
-                var doc = new ObjectMapper().readValue(docJson, Map.class);
+                var doc = docJson == null ? null : new ObjectMapper().readValue(docJson, Map.class);
                 var malformed = malformedJson == null ? null : new ObjectMapper().readValue(malformedJson, Map.class);
                 // build final representation
                 results.add(
-                        new HashMap<>() {{
-                            put("id", id);
-                            put("doc", doc);
-                            put("malformed", (malformed != null && malformed.isEmpty()) ? null : malformed);
-                            put("err", errText);
-                        }}
-                );
+                        new HashMap<>() {
+                            {
+                                put("id", id);
+                                put("doc", doc);
+                                put("malformed", (malformed != null && malformed.isEmpty()) ? null : malformed);
+                                put("err", errText);
+                            }
+                        });
             }
             itemsSet.close();
 
@@ -347,9 +436,7 @@ public class PostgresCrateDBIT {
                                     put("new_col", "7");
                                 }
                             });
-                            put("malformed", Map.of(
-                                    "new_col", 7
-                            ));
+                            put("malformed", Map.of("new_col", 7));
                             put("err", null);
                         }
                     });
@@ -362,10 +449,56 @@ public class PostgresCrateDBIT {
                                     put("new_col", "[1.1, 2.2, 3.3]");
                                 }
                             });
-                            put("malformed",  Map.of(
-                                    "new_col", List.of(1.1, 2.2, 3.3)
-                            ));
+                            put("malformed", Map.of("new_col", List.of(1.1, 2.2, 3.3)));
                             put("err", null);
+                        }
+                    });
+                    add(new HashMap<>() {
+                        {
+                            put("id", "9");
+                            put("doc", new HashMap<>() {
+                                {
+                                    put("id", 9);
+                                    put("dyn", new ArrayList<>() {{
+                                        add(1);
+                                        add(null);
+                                        add(null);
+                                    }});
+                                }
+                            });
+                            put("malformed", Map.of("dyn", new ArrayList<>() {{
+                                add(null);
+                                add(false);
+                                add("ok");
+                            }}));
+                            put("err", null);
+                        }
+                    });
+                    add(new HashMap<>() {
+                        {
+                            put("id", "10");
+                            put("doc", new HashMap<>() {
+                                {
+                                    put("id", 10);
+                                    // Debezium PostgresValueConverter logs warn in logs, and don't support nested arrays
+                                    // Unexpected value for JDBC type 4 and column nest-element int4(10, 0) DEFAULT VALUE NULL: class=Integer[]
+                                    put("nest", new ArrayList<>() {{
+                                        add(null);
+                                        add(null);
+                                        add(null);
+                                    }});
+                                }
+                            });
+                            put("malformed", null);
+                            put("err", null);
+                        }
+                    });
+                    add(new HashMap<>() {
+                        {
+                            put("id", "11");
+                            put("doc", null);
+                            put("malformed", null);
+                            put("err", "ERROR: Dynamic nested arrays are not supported");
                         }
                     });
                 }
@@ -648,8 +781,8 @@ public class PostgresCrateDBIT {
                                     put("small_int_value", 32767);
                                     put("int_value", 2147483647);
                                     put("big_int_value", 9223372036854775807L);
-                                    put("decimal_value", "SZYC0g=="); // FIXME https://debezium.io/documentation/faq/#how_to_retrieve_decimal_field_from_binary_representation
-                                    put("numeric_value", "EtaH");
+                                    put("decimal_value", "12345.67890");
+                                    put("numeric_value", "12345.67");
                                     put("real_value", 1.2345);
                                     put("double_value", 1.2345678912345678E8);
                                     put("small_serial", 1);
@@ -665,11 +798,11 @@ public class PostgresCrateDBIT {
                                     put("timestamptz_value", "2024-01-01T12:34:56.000000Z");
                                     put("interval_value", 37076400000000L); // debezium interpretation: The approximate number of microseconds for a time interval using the 365.25 / 12.0 formula for days per month average.
                                     put("uuid_value", "123e4567-e89b-12d3-a456-426614174000");
-                                    put("json_value", "{\"key\": \"value\"}");
-                                    put("jsonb_value", "{\"key\": \"value\"}");
+                                    put("json_value", Map.of("key", "value"));
+                                    put("jsonb_value", Map.of("key", "value"));
                                     put("xml_value", "<tag>Example XML</tag>");
                                     put("array_value", new ArrayList(List.of(1, 2, 3)));
-                                    put("hstore_value", "{\"key\":\"value\"}");
+                                    put("hstore_value", Map.of("key", "value"));
                                     put("inet_value", "192.168.1.1");
                                     put("cidr_value", "192.168.100.128/25");
                                     put("macaddr_value", "08:00:2b:01:02:03");
