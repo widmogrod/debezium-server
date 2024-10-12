@@ -25,6 +25,7 @@ public class DataGen {
             ";", ":", "'", "\"", "<", ">", "?", "/", "~", "`");
 
     static final public List<String> shortTypeNames = List.of(
+            "int", "list", "object", "tz", "text",
             "smallint", "bigint", "integer",
             "double precision", "real",
             "timestamp with time zone", "timestamp without time zone",
