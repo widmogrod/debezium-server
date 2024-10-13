@@ -23,7 +23,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import io.debezium.embedded.EmbeddedEngineChangeEvent;
+import io.debezium.server.cratedb.schema.CrateSQL;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.Dependent;
@@ -39,6 +39,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.debezium.DebeziumException;
+import io.debezium.embedded.EmbeddedEngineChangeEvent;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.DebeziumEngine.RecordCommitter;
@@ -118,7 +119,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
             if (conn == null) {
                 conn = DriverManager.getConnection(url);
-                // conn.setAutoCommit(false);
+                conn.setAutoCommit(false);
                 LOGGER.debug("New connection established");
             }
 
@@ -235,9 +236,23 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                             var result = Evolution.fromObject(schema0, object0);
                             var schema1 = result.getLeft();
                             var object1 = result.getRight();
+                            // perform alter
+                            var alters = CrateSQL.toSQL(tableId, schema0, schema1);
+                            for (var alter : alters) {
+                                try {
+                                    try (var stmt = conn.createStatement()) {
+                                        stmt.executeUpdate(alter.toString());
+                                    }
+                                }
+                                catch (SQLException e) {
+                                    LOGGER.warn("Error while executing alter {}", alter, e);
+                                }
+                            }
+
                             // update what we learn about schema
                             schema0 = schema1;
                             tablesSchema.put(tableId, schema1);
+
                             // use final representation of object as something we will insert into database
                             String recordDoc = getRecordDoc(schema1, object1);
                             String malformedDoc = getMalformedDoc(schema1, object1);
@@ -432,9 +447,8 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     private String getMalformedDoc(Schema.I schema, Object object) {
         try {
             return switch (getStrategyType()) {
-                case STORE_MALFORMED_FRAGMENTS, TYPE_SUFFIX_AND_MALFORMED ->
-                    convertToJson(Evolution.extractNonCasted(object));
-
+                case STORE_MALFORMED_FRAGMENTS -> convertToJson(Evolution.extractNonCasted(object));
+                case TYPE_SUFFIX_AND_MALFORMED -> convertToJson(Evolution.extractNonCasted(Evolution.typeSuffix(schema, object)));
                 default -> null;
             };
         }
@@ -475,7 +489,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     private TypeConflictResolution.Strategy getStrategyType() {
         if (strategyType == null) {
             strategyType = TypeConflictResolution.fromString(strategyName);
-            LOGGER.info("Using strategy '{}'", TypeConflictResolution.stringify(strategyType));
+            LOGGER.info("Using strategy '{}' value {}", TypeConflictResolution.stringify(strategyType), strategyName);
         }
 
         return strategyType;
