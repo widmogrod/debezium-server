@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.debezium.server.cratedb.datagen.DataGen;
 import jakarta.inject.Inject;
 
 import org.awaitility.Awaitility;
@@ -42,6 +41,7 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 
 import io.debezium.server.DebeziumServer;
+import io.debezium.server.cratedb.datagen.DataGen;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 
