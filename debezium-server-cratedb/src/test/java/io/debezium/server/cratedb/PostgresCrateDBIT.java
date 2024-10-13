@@ -459,18 +459,22 @@ public class PostgresCrateDBIT {
                             put("doc", new HashMap<>() {
                                 {
                                     put("id", 9);
-                                    put("dyn", new ArrayList<>() {{
-                                        add(1);
-                                        add(null);
-                                        add(null);
-                                    }});
+                                    put("dyn", new ArrayList<>() {
+                                        {
+                                            add(1);
+                                            add(null);
+                                            add(null);
+                                        }
+                                    });
                                 }
                             });
-                            put("malformed", Map.of("dyn", new ArrayList<>() {{
-                                add(null);
-                                add(false);
-                                add("ok");
-                            }}));
+                            put("malformed", Map.of("dyn", new ArrayList<>() {
+                                {
+                                    add(null);
+                                    add(false);
+                                    add("ok");
+                                }
+                            }));
                             put("err", null);
                         }
                     });
@@ -482,11 +486,13 @@ public class PostgresCrateDBIT {
                                     put("id", 10);
                                     // Debezium PostgresValueConverter logs warn in logs, and don't support nested arrays
                                     // Unexpected value for JDBC type 4 and column nest-element int4(10, 0) DEFAULT VALUE NULL: class=Integer[]
-                                    put("nest", new ArrayList<>() {{
-                                        add(null);
-                                        add(null);
-                                        add(null);
-                                    }});
+                                    put("nest", new ArrayList<>() {
+                                        {
+                                            add(null);
+                                            add(null);
+                                            add(null);
+                                        }
+                                    });
                                 }
                             });
                             put("malformed", null);
