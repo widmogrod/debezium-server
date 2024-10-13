@@ -340,7 +340,7 @@ public class PostgresCrateDBIT {
                     stmt.execute("REFRESH TABLE testc_inventory_cratedb_test;");
                     var result = stmt.executeQuery("SELECT COUNT(1) FROM testc_inventory_cratedb_test");
                     result.next();
-                    return result.getInt(1) > 2;
+                    return result.getInt(1) == expectedPostgresState.size();
                 }
                 catch (SQLException e) {
                     return false;
