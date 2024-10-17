@@ -25,6 +25,7 @@ log
 npm-debug.log
 .DS_Store
 phantomjsdriver.log
+.envrc
 
 generated-sources/
 
