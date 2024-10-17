@@ -23,7 +23,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import io.debezium.server.cratedb.schema.TypeWrap;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.Dependent;
@@ -47,9 +46,9 @@ import io.debezium.serde.DebeziumSerdes;
 import io.debezium.server.BaseChangeConsumer;
 import io.debezium.server.cratedb.infoschema.DataLoader;
 import io.debezium.server.cratedb.infoschema.SchemaBuilder;
-import io.debezium.server.cratedb.schema.CrateSQL;
 import io.debezium.server.cratedb.schema.Evolution;
 import io.debezium.server.cratedb.schema.Schema;
+import io.debezium.server.cratedb.schema.TypeWrap;
 
 /**
  * Implementation of the consumer that delivers the messages into CrateDB
@@ -237,18 +236,6 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                             var result = Evolution.fromObject(schema0, object0);
                             var schema1 = result.getLeft();
                             var object1 = result.getRight();
-                            // perform alter
-                            var alters = CrateSQL.toSQL(tableId, schema0, schema1);
-                            for (var alter : alters) {
-                                try {
-                                    try (var stmt = conn.createStatement()) {
-                                        stmt.executeUpdate(alter.toString());
-                                    }
-                                }
-                                catch (SQLException e) {
-                                    LOGGER.warn("Error while executing alter {}", alter, e);
-                                }
-                            }
 
                             // update what we learn about schema
                             schema0 = schema1;
@@ -404,8 +391,9 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
         Object result;
         if (record instanceof EmbeddedEngineChangeEvent<?, ?, ?> che) {
             var source = che.sourceRecord();
-             result = KafkaDataToJavaLangConverter.convertToJavaObject(source.valueSchema(), source.value());
-        } else {
+            result = KafkaDataToJavaLangConverter.convertToJavaObject(source.valueSchema(), source.value());
+        }
+        else {
             var bytes = getBytes(value);
             result = serdeValue.readValue(bytes, Object.class);
             result = Evolution.dedebeziumArrayDocuments(result);
