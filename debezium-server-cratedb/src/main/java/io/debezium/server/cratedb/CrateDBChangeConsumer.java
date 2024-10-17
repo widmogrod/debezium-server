@@ -23,7 +23,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import io.debezium.server.cratedb.schema.CrateSQL;
+import io.debezium.server.cratedb.schema.TypeWrap;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.Dependent;
@@ -47,6 +47,7 @@ import io.debezium.serde.DebeziumSerdes;
 import io.debezium.server.BaseChangeConsumer;
 import io.debezium.server.cratedb.infoschema.DataLoader;
 import io.debezium.server.cratedb.infoschema.SchemaBuilder;
+import io.debezium.server.cratedb.schema.CrateSQL;
 import io.debezium.server.cratedb.schema.Evolution;
 import io.debezium.server.cratedb.schema.Schema;
 
@@ -400,14 +401,20 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             return null;
         }
 
+        Object result;
         if (record instanceof EmbeddedEngineChangeEvent<?, ?, ?> che) {
             var source = che.sourceRecord();
-            return KafkaDataToJavaLangConverter.convertToJavaObject(source.valueSchema(), source.value());
+             result = KafkaDataToJavaLangConverter.convertToJavaObject(source.valueSchema(), source.value());
+        } else {
+            var bytes = getBytes(value);
+            result = serdeValue.readValue(bytes, Object.class);
+            result = Evolution.dedebeziumArrayDocuments(result);
         }
 
-        var bytes = getBytes(value);
-        var result = serdeValue.readValue(bytes, Object.class);
-        result = Evolution.dedebeziumArrayDocuments(result);
+        if (getStrategyType() == TypeConflictResolution.Strategy.TYPE_WRAP_AND_MALFORMED) {
+            result = TypeWrap.wrap(result);
+        }
+
         return result;
     }
 
