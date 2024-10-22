@@ -43,6 +43,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.server.DebeziumServer;
+import io.debezium.server.cratedb.datagen.DataGen;
+import io.debezium.server.cratedb.schema.Evolution;
+import io.debezium.server.cratedb.schema.PartialValue;
 import io.debezium.util.Testing;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -313,7 +316,7 @@ public class PostgresCrateDBIT {
                             put("id", 10);
                             put("new_col", null);
                             put("dyn", List.of());
-                            put("nest", new Integer[][]{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}});
+                            put("nest", new Integer[][]{ { 1, 2, 3 }, { 4, 5, 6 }, { 7, 8, 9 } });
                             put("nest2", null);
                         }
                     },
@@ -830,6 +833,108 @@ public class PostgresCrateDBIT {
                                     // put("path_value", "[(0,0),(1,1),(1,0)]");
                                     // put("polygon_value", "((0,0),(1,1),(1,0),(0,0))");
                                     // put("circle_value", "<(0,0),5>");
+                                }
+                            });
+                        }
+                    });
+                }
+            };
+
+            assertThat(results).isEqualTo(expectedResults);
+
+            return true;
+        });
+    }
+
+    @Test
+    void testVeryBigStrings() {
+        Testing.Print.enable();
+
+        var massiveText = DataGen.generateMassiveString();
+
+        Awaitility.await().atMost(Duration.ofSeconds(Profile.waitForSeconds())).until(() -> {
+            final PostgresConnection connection = PostgresTestResourceLifecycleManager.getPostgresConnection();
+            // data manipulation
+            connection.execute("DROP TABLE IF EXISTS inventory.cratedb_test;");
+            connection.execute("""
+                    CREATE TABLE inventory.cratedb_test (
+                        serial_id           SERIAL PRIMARY KEY,
+                        text_value          TEXT
+                    );
+                    """);
+            connection.prepareUpdate("""
+                    INSERT INTO inventory.cratedb_test (
+                        serial_id,
+                        text_value
+                    ) VALUES (1, ?);
+                    """, statement -> {
+                statement.setString(1, massiveText);
+            }).execute();
+
+            // Assert postgresql final state is as expected
+            List<Object> resultPostgres = new ArrayList<>();
+            connection.query("SELECT * FROM inventory.cratedb_test", new JdbcConnection.ResultSetConsumer() {
+                @Override
+                public void accept(ResultSet rs) throws SQLException {
+                    // Gather all the table data
+                    while (rs.next()) {
+                        var data = new HashMap<String, Object>();
+                        data.put("serial_id", rs.getInt("serial_id"));
+                        data.put("text_value", rs.getString("text_value"));
+                        resultPostgres.add(data);
+                    }
+                }
+            });
+            connection.close();
+
+            // And finally check the state
+            var expectedPostgresState = Arrays.asList(
+                    new HashMap<String, Object>() {
+                        {
+                            put("serial_id", 1);
+                            put("text_value", massiveText);
+                        }
+                    });
+            assertThat(resultPostgres).usingRecursiveComparison().isEqualTo(expectedPostgresState);
+
+            // Let's proceed with CrateDB
+            Statement stmt = conn.createStatement();
+
+            // Let's give some time to propagate the changes
+            // First let's refresh the table that should be created by consumer
+            // IF this step fails, most likely, consumer haven't process any events
+            Awaitility.await().atMost(Duration.ofSeconds(Profile.waitForSeconds())).until(() -> {
+                try {
+                    stmt.execute("REFRESH TABLE testc_inventory_cratedb_test;");
+                    var result = stmt.executeQuery("SELECT COUNT(1) FROM testc_inventory_cratedb_test");
+                    result.next();
+                    return result.getInt(1) == expectedPostgresState.size();
+                }
+                catch (SQLException e) {
+                    return false;
+                }
+            });
+
+            List<Object> results = new ArrayList<>();
+            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_cratedb_test ORDER BY id ASC;");
+            while (itemsSet.next()) {
+                String id = itemsSet.getString(1);
+                String docJson = itemsSet.getString(2);
+                Map doc = new ObjectMapper().readValue(docJson, Map.class);
+
+                results.add(Map.of("id", id, "doc", doc));
+            }
+            itemsSet.close();
+
+            List<HashMap<String, Object>> expectedResults = new ArrayList<>() {
+                {
+                    add(new HashMap<>() {
+                        {
+                            put("id", "1");
+                            put("doc", new HashMap<String, Object>() {
+                                {
+                                    put("serial_id", 1);
+                                    put("text_value", ((PartialValue) Evolution.normalizeString(massiveText)).normalised());
                                 }
                             });
                         }
