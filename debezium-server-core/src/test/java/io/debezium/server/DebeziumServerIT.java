@@ -20,7 +20,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.server.events.ConnectorCompletedEvent;
 import io.debezium.server.events.ConnectorStartedEvent;
-import io.debezium.testing.testcontainers.PostgresTestResourceLifecycleManager;
 import io.debezium.util.Testing;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
