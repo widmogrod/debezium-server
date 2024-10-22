@@ -50,8 +50,8 @@ public class Evolution {
                 case Schema.Primitive.DOUBLE -> Pair.of(schema, object);
                 default -> fallbackToTryCast(schema, object);
             };
-            case String ignored -> switch (schema) {
-                case Schema.Primitive.TEXT -> Pair.of(schema, object);
+            case String str -> switch (schema) {
+                case Schema.Primitive.TEXT -> Pair.of(schema, normalizeString(str));
                 default -> fallbackToTryCast(schema, object);
             };
             case Boolean ignored -> switch (schema) {
@@ -159,6 +159,46 @@ public class Evolution {
         };
     }
 
+    public static boolean shouTrimString(String str) {
+        if (str == null) {
+            return false;
+        }
+
+        return str.length() > 32764 / 2;
+    }
+
+    public static String trimString(String str) {
+        // fix for error: whose UTF8 encoding is longer than the max length 32766
+        if (str == null) {
+            return null;
+        }
+
+        return str.substring(0, Math.min(str.length(), 32764 / 2));
+    }
+
+    public static Object normalizeString(PartialValue value) {
+        if (value == null) {
+            return null;
+        }
+
+        var val = value.normalised();
+
+        if (val instanceof String str && shouTrimString(str)) {
+            return PartialValue.of(trimString(str), value.original());
+        }
+
+        return val;
+    }
+
+    public static Object normalizeString(String str) {
+        // fix for error: whose UTF8 encoding is longer than the max length 32766
+        if (shouTrimString(str)) {
+            return PartialValue.of(trimString(str), str);
+        }
+
+        return str;
+    }
+
     public static Pair<Schema.I, Object> fallbackToTryCast(Schema.I schema, Object object) {
         var finalSchema = merge(schema, detectType(object));
         var finalValue = tryCast(object, finalSchema);
@@ -211,6 +251,10 @@ public class Evolution {
             return tryCast(partialValue.original(), type);
         }
 
+        if (value == null) {
+            return null;
+        }
+
         return switch (type) {
             case Schema.Primitive primitive -> switch (primitive) {
                 case Schema.Primitive.BIGINT -> {
@@ -230,11 +274,11 @@ public class Evolution {
                     }
                 }
                 case Schema.Primitive.TEXT -> {
-                    if (value instanceof String) {
-                        yield value.toString();
+                    if (value instanceof String str) {
+                        yield normalizeString(str);
                     }
 
-                    yield PartialValue.of(value.toString(), value);
+                    yield normalizeString(PartialValue.of(value.toString(), value));
                 }
                 case Schema.Primitive.BOOLEAN -> {
                     if (value instanceof Boolean bool) {
