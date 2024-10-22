@@ -173,7 +173,7 @@ public class Evolution {
             return null;
         }
 
-        return str.substring(0, Math.min(str.length(), 32764 / 2));
+        return str.substring(0, Math.min(str.length()-1, 32764 / 2));
     }
 
     public static Object normalizeString(PartialValue value) {
@@ -181,13 +181,12 @@ public class Evolution {
             return null;
         }
 
-        var val = value.normalised();
-
-        if (val instanceof String str && shouTrimString(str)) {
+        var normalized = value.normalised();
+        if (normalized instanceof String str && shouTrimString(str)) {
             return PartialValue.of(trimString(str), value.original());
         }
 
-        return val;
+        return value;
     }
 
     public static Object normalizeString(String str) {

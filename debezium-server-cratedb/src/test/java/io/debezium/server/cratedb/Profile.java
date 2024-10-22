@@ -47,9 +47,9 @@ public class Profile {
             params.put("debezium.source.offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore");
 
             // There is strange bug, and if I don't define DEBEZIUM_SOURCE_TABLE_INCLUDE_LIST it always sets "public.table_name"
-            params.put("DEBEZIUM_SOURCE_TABLE_INCLUDE_LIST", "inventory.customers, inventory.cratedb_test");
+            params.put("DEBEZIUM_SOURCE_TABLE_INCLUDE_LIST", "inventory.customers,inventory.cratedb_test,inventory.cratedb_test2");
             params.put("debezium.source.schema.include.list", "inventory");
-            params.put("debezium.source.table.include.list", "inventory.customers,inventory.cratedb_test");
+            params.put("debezium.source.table.include.list", "inventory.customers,inventory.cratedb_test,inventory.cratedb_test2");
 
             // CrateDB sink can infer schema on it's own
             // no need to send schema information

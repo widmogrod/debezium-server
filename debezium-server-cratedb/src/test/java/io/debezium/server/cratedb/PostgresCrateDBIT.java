@@ -88,7 +88,7 @@ public class PostgresCrateDBIT {
                 .containsEntry("name", "cratedb")
                 .containsEntry("offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
                 .containsEntry("schema.include.list", "inventory")
-                .containsEntry("table.include.list", "inventory.customers, inventory.cratedb_test")
+                .containsEntry("table.include.list", "inventory.customers,inventory.cratedb_test,inventory.cratedb_test2")
                 .containsEntry("transforms", "unwrap")
                 .containsEntry("transforms.unwrap.type", "io.debezium.transforms.ExtractNewRecordState")
                 .containsEntry("transforms.unwrap.add.headers", "op")
@@ -855,15 +855,15 @@ public class PostgresCrateDBIT {
         Awaitility.await().atMost(Duration.ofSeconds(Profile.waitForSeconds())).until(() -> {
             final PostgresConnection connection = PostgresTestResourceLifecycleManager.getPostgresConnection();
             // data manipulation
-            connection.execute("DROP TABLE IF EXISTS inventory.cratedb_test;");
+            connection.execute("DROP TABLE IF EXISTS inventory.cratedb_test2;");
             connection.execute("""
-                    CREATE TABLE inventory.cratedb_test (
+                    CREATE TABLE inventory.cratedb_test2 (
                         serial_id           SERIAL PRIMARY KEY,
                         text_value          TEXT
                     );
                     """);
             connection.prepareUpdate("""
-                    INSERT INTO inventory.cratedb_test (
+                    INSERT INTO inventory.cratedb_test2 (
                         serial_id,
                         text_value
                     ) VALUES (1, ?);
@@ -873,7 +873,7 @@ public class PostgresCrateDBIT {
 
             // Assert postgresql final state is as expected
             List<Object> resultPostgres = new ArrayList<>();
-            connection.query("SELECT * FROM inventory.cratedb_test", new JdbcConnection.ResultSetConsumer() {
+            connection.query("SELECT * FROM inventory.cratedb_test2", new JdbcConnection.ResultSetConsumer() {
                 @Override
                 public void accept(ResultSet rs) throws SQLException {
                     // Gather all the table data
@@ -905,8 +905,8 @@ public class PostgresCrateDBIT {
             // IF this step fails, most likely, consumer haven't process any events
             Awaitility.await().atMost(Duration.ofSeconds(Profile.waitForSeconds())).until(() -> {
                 try {
-                    stmt.execute("REFRESH TABLE testc_inventory_cratedb_test;");
-                    var result = stmt.executeQuery("SELECT COUNT(1) FROM testc_inventory_cratedb_test");
+                    stmt.execute("REFRESH TABLE testc_inventory_cratedb_test2;");
+                    var result = stmt.executeQuery("SELECT COUNT(1) FROM testc_inventory_cratedb_test2");
                     result.next();
                     return result.getInt(1) == expectedPostgresState.size();
                 }
@@ -916,7 +916,7 @@ public class PostgresCrateDBIT {
             });
 
             List<Object> results = new ArrayList<>();
-            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_cratedb_test ORDER BY id ASC;");
+            ResultSet itemsSet = stmt.executeQuery("SELECT id, doc FROM testc_inventory_cratedb_test2 ORDER BY id ASC;");
             while (itemsSet.next()) {
                 String id = itemsSet.getString(1);
                 String docJson = itemsSet.getString(2);
