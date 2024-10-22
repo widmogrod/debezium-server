@@ -108,4 +108,18 @@ public class DataGen {
             return List.of();
         }
     }
+
+    public static String generateMassiveString() {
+        // Create a StringBuilder object
+        StringBuilder sb = new StringBuilder(32000);
+
+        // Generate 32,000 characters
+        for (int i = 0; i < 49793; i++) {
+            // Add a random character (for example, a-z)
+            sb.append((char) ('a' + (i % 26))); // appending letters from 'a' to 'z' in a loop
+        }
+
+        // Convert the StringBuilder to a String
+        return sb.toString();
+    }
 }
