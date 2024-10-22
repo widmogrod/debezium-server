@@ -63,7 +63,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
 
     // SQL statements used to interact with the CrateDB
     public static final String SQL_CREATE_TABLE = """
-            CREATE TABLE IF NOT EXISTS %s (
+            CREATE TABLE IF NOT EXISTS "%s" (
                 id varchar PRIMARY KEY,
                 doc OBJECT,
                 malformed OBJECT(IGNORED),
@@ -72,7 +72,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
             WITH ("mapping.total_fields.limit" = 20000)
             """;
     public static final String SQL_UPSERT = """
-            INSERT INTO %s (id, doc, malformed, err)
+            INSERT INTO "%s" (id, doc, malformed, err)
             VALUES (?::varchar, ?::JSON, ?::JSON, NULL)
             ON CONFLICT (id) DO UPDATE
                 SET doc = excluded.doc
@@ -80,7 +80,7 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
                   , err = excluded.err
             """;
     public static final String SQL_UPSERT_ERR = """
-            INSERT INTO %s (id, err)
+            INSERT INTO "%s" (id, err)
             VALUES (?::varchar, ?::TEXT)
             ON CONFLICT (id) DO UPDATE
                 SET err = excluded.err
@@ -453,7 +453,8 @@ public class CrateDBChangeConsumer extends BaseChangeConsumer implements Debeziu
     }
 
     private String getErrorDoc(Exception exception) {
-        return Arrays.stream(exception.getMessage().split("\n")).limit(1).collect(Collectors.joining("\n"));
+        var result = Arrays.stream(exception.getMessage().split("\n")).limit(1).collect(Collectors.joining("\n"));
+        return result.substring(0, Math.min(300, result.length()));
     }
 
     private void maybeCreateTable(String tableId) {
